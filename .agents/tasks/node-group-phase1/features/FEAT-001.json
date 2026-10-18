@@ -1,0 +1,25 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "核心分组数据模型 + 纯几何/成员判定逻辑 + DTO 持久化管线 + xUnit 单测。全部在 Sz3D.Core.Infrastructure，无任何 WPF 依赖，可独立编译与测试。为 FEAT-002（WPF 层）提供模型与几何函数。此 FEAT 与 FEAT-002 不独立——FEAT-002 依赖本 FEAT 的类型，必须先完成本 FEAT。",
+  "status": "completed",
+  "steps": [
+    "新建 d:\\kiro\\Sz3D\\src\\Sz3D.Core.Infrastructure\\Graph\\GroupModel.cs：sealed class GroupModel，字段 Guid Id {init} = Guid.NewGuid()、string Title {get;set;}=\"Group\"、double X/Y {get;set;}（左上角画布坐标）、double Width/Height {get;set;}、string Color {get;set;}=\"#0E639C\"（header 颜色）。镜像同目录 GraphModel.cs 里 NodeModel 的风格。公共类型/成员加 XML <summary>。",
+    "修改 d:\\kiro\\Sz3D\\src\\Sz3D.Core.Infrastructure\\Graph\\GraphModel.cs：在 GraphModel 加 public ObservableCollection<GroupModel> Groups { get; } = [];，并加 public Result AddGroup(GroupModel group)（ArgumentNullException.ThrowIfNull，Groups.Add，返回 Result.Ok()）与 public Result RemoveGroup(Guid groupId)（找不到返回 Result.Fail($\"Group {groupId} not found.\")，找到则仅 Groups.Remove(group)，不触碰 Nodes/Connections）。镜像现有 AddNode/RemoveNode 风格并加 XML 注释。",
+    "新建 d:\\kiro\\Sz3D\\src\\Sz3D.Core.Infrastructure\\Graph\\GroupMembership.cs：static class GroupMembership，无 WPF 依赖。方法 bool Contains(GroupModel group, double nodeX, double nodeY)（判断点是否落在矩形 [X, X+Width]×[Y, Y+Height]，采用闭区间含边界，XML 注释写明）；IReadOnlyList<NodeModel> MembersOf(GroupModel group, IEnumerable<NodeModel> nodes)（返回 Location 落在 group 内的节点，用 Contains(group, n.X, n.Y)）；GroupModel? GroupContaining(IEnumerable<GroupModel> groups, double nodeX, double nodeY)（返回包含该点且面积 Width*Height 最小的分组，无则 null；判定规则写进 XML 注释）。用 var、集合表达式、模式匹配。",
+    "修改 d:\\kiro\\Sz3D\\src\\Sz3D.Core.Infrastructure\\Models\\ProjectDtos.cs：新增 public sealed record GroupDto { Guid Id; string Title=\"\"; double X; double Y; double Width; double Height; string Color=\"\"; }（init 属性，与 NodeDto 同风格）；给 GraphDto 加 public List<GroupDto> Groups { get; init; } = [];。保持 System.Text.Json，不引 Newtonsoft。",
+    "新建 d:\\kiro\\Sz3D\\tests\\Sz3D.Core.Infrastructure.Tests\\GroupModelTests.cs（必要时再加 GroupMembershipTests.cs）：镜像 GraphModelTests.cs 的 [Fact]/Assert 风格。覆盖：Contains 命中/未命中/四边界点；MembersOf 从多节点中筛出成员；GroupContaining 无重叠返回 null、单包含返回该组、多重叠返回面积最小者；GraphModel.AddGroup 使 Groups 计数+1；RemoveGroup 删除分组但保留原有 Nodes（放一个节点进 group 区域，删 group 后 Nodes 仍在）；RemoveGroup 对不存在的 Id 返回 IsSuccess=false。"
+  ],
+  "acceptance_criteria": [
+    "dotnet build d:\\kiro\\Sz3D\\src\\Sz3D.Core.Infrastructure\\Sz3D.Core.Infrastructure.csproj 成功，0 错误。",
+    "GroupModel、GraphModel.Groups/AddGroup/RemoveGroup、GroupMembership.Contains/MembersOf/GroupContaining、GroupDto、GraphDto.Groups 均存在且带 XML 注释。",
+    "新增单测覆盖几何边界、成员筛选、GroupContaining 最小面积、RemoveGroup 保留成员节点，运行后全部通过且原有 6 个测试不回归。",
+    "Sz3D.Core.Infrastructure 不新增任何 WPF/System.Windows.Controls 引用。"
+  ],
+  "verification": [
+    "dotnet build d:\\kiro\\Sz3D\\src\\Sz3D.Core.Infrastructure\\Sz3D.Core.Infrastructure.csproj -c Debug  —— 成功无错误",
+    "dotnet test d:\\kiro\\Sz3D\\tests\\Sz3D.Core.Infrastructure.Tests\\Sz3D.Core.Infrastructure.Tests.csproj  —— 新增测试通过，总数 >= 原 6 个且全绿"
+  ],
+  "blocked_reason": null,
+  "findings": "FEAT-002（WPF 层）可依赖以下已落地的核心类型（命名空间 Sz3D.Core.Infrastructure.Graph，核心库无 WPF 依赖）：\n\n【GroupModel】sealed class，字段与默认值：\n- Guid Id { get; init; } = Guid.NewGuid();（init-only）\n- string Title { get; set; } = \"Group\";\n- double X { get; set; }（默认 0，左上角画布 X）\n- double Y { get; set; }（默认 0，左上角画布 Y）\n- double Width { get; set; }（默认 0）\n- double Height { get; set; }（默认 0）\n- string Color { get; set; } = \"#0E639C\";（header 颜色，十六进制字符串）\n\n【GroupMembership（static class）方法签名】\n- static bool Contains(GroupModel group, double nodeX, double nodeY)\n- static IReadOnlyList<NodeModel> MembersOf(GroupModel group, IEnumerable<NodeModel> nodes)\n- static GroupModel? GroupContaining(IEnumerable<GroupModel> groups, double nodeX, double nodeY)\n三个方法均对 null 参数抛 ArgumentNullException.ThrowIfNull。\n\n【Contains 判定规则】闭区间含边界：nodeX ∈ [X, X+Width] 且 nodeY ∈ [Y, Y+Height] 时命中（四条边与四角都算命中）。MembersOf 用节点左上角坐标 (n.X, n.Y) 调 Contains 筛选。\n\n【GroupContaining 重叠判定规则】先用 Contains 过滤出所有包含该点的分组，再按面积 Width*Height 升序取最小者（嵌套时返回视觉最内层）；无任何分组包含该点返回 null。注意：面积相等时 OrderBy 稳定排序返回枚举中靠前者。\n\n【GraphModel 新增成员】\n- ObservableCollection<GroupModel> Groups { get; } = [];（只读属性，不替换引用）\n- Result AddGroup(GroupModel group)：ThrowIfNull → Groups.Add → Result.Ok()\n- Result RemoveGroup(Guid groupId)：找不到返回 Result.Fail($\"Group {groupId} not found.\")；找到仅 Groups.Remove(group)，不触碰 Nodes/Connections（分组内节点保留）\n（Result 来自 Sz3D.Core.Infrastructure.Common，record，IsSuccess/Error，工厂 Ok()/Fail(string)）\n\n【DTO 持久化】Sz3D.Core.Infrastructure.Models：新增 sealed record GroupDto { Guid Id; string Title=\"\"; double X; double Y; double Width; double Height; string Color=\"\"; }（全 init 属性）；GraphDto 加 List<GroupDto> Groups { get; init; } = [];。System.Text.Json，无 Newtonsoft。\n\n【验证结果】Sz3D.Core.Infrastructure build 成功；Sz3D.Core.Infrastructure.Tests 总计 16 测试全绿（6 基线不回归 + 10 新增：GroupModelTests.cs）。"
+}

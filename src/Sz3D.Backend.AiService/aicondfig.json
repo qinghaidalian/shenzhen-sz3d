@@ -1,0 +1,14 @@
+{
+  "models": [
+    {
+      "model_id": "unstacking",
+      "model_type": "maskrcnn",
+      "model_path": "models/unstacking.onnx",
+      "device": "cuda",
+      "gpu_index": 0,
+      "score_threshold": 0.8,
+      "iou_threshold": 0.5,
+      "keypoint_threshold": 0.5
+    }
+  ]
+}

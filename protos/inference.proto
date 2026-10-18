@@ -1,0 +1,118 @@
+﻿syntax = "proto3";
+
+option csharp_namespace = "Sz3D.Backend.AiService.Grpc";
+
+package ai_inference;
+
+// ── 模型类型 ──────────────────────────────────────────────────
+enum ModelType {
+  MODEL_TYPE_UNSPECIFIED = 0;
+  MASK_RCNN  = 1;   // 实例分割：输出检测框 + 像素掩码
+  YOLO       = 2;   // 目标检测
+  KEY_POINT  = 3;   // 关键点检测：掩码 + 关键点
+}
+
+// ── 推理设备 ──────────────────────────────────────────────────
+message DeviceSpec {
+  string provider = 1;   // "cpu" | "cuda"
+  int32  gpu_index = 2;  // CUDA 设备编号（provider=cuda 时有效）
+}
+
+// ── 推理服务 ──────────────────────────────────────────────────
+service InferenceService {
+  // 加载模型（幂等，已加载则跳过）
+  rpc LoadModel   (LoadModelRequest)   returns (LoadModelResponse);
+  // 列出服务端注册表中已配置的模型（含加载状态）
+  rpc ListModels  (ListModelsRequest)  returns (ListModelsResponse);
+  // 单次图像推理
+  rpc Infer       (InferRequest)       returns (InferResponse);
+  // 流式批量推理
+  rpc InferStream (stream InferRequest) returns (stream InferResponse);
+  // 卸载模型释放内存
+  rpc UnloadModel (UnloadModelRequest) returns (UnloadModelResponse);
+  // 健康检查
+  rpc HealthCheck (HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+// ── 模型加载 ──────────────────────────────────────────────────
+message LoadModelRequest {
+  string    model_id   = 1;   // 模型唯一标识（对应服务端注册表或显式路径）
+  string    model_path = 2;   // 可选：显式模型文件路径；为空时按 model_id 从注册表解析
+  ModelType model_type = 3;   // 模型类型，决定输出解析方式
+  DeviceSpec device    = 4;   // 推理设备；为空时回退注册表配置或 CPU
+  float score_threshold    = 5;  // 分数阈值，范围 [0,1]，默认 0.8
+  float iou_threshold      = 6;  // YOLO NMS 的 IOU 阈值，默认 0.5
+  float keypoint_threshold = 7;  // 关键点分数阈值，默认 0.5
+}
+
+message LoadModelResponse {
+  bool   success      = 1;
+  string error_message = 2;
+  string model_id     = 3;
+}
+
+// ── 模型注册表 ────────────────────────────────────────────────
+message ListModelsRequest {}
+
+message ListModelsResponse {
+  repeated ModelInfo models = 1;
+}
+
+message ModelInfo {
+  string     model_id   = 1;
+  ModelType  model_type = 2;
+  string     model_path = 3;
+  DeviceSpec device     = 4;
+  float score_threshold    = 5;
+  float iou_threshold      = 6;
+  float keypoint_threshold = 7;
+  bool   loaded      = 8;   // 是否已加载到内存
+}
+
+// ── 推理 ──────────────────────────────────────────────────────
+message InferRequest {
+  string model_id    = 1;
+  bytes  image_data  = 2;   // 原始图像字节（PNG/JPG 编码）
+  int32  image_width = 3;
+  int32  image_height = 4;
+  map<string, string> params = 5;  // 预处理参数（如归一化均值/方差）
+}
+
+message InferResponse {
+  bool              success      = 1;
+  string            error_message = 2;
+  repeated BoundingBox detections = 3;  // 目标检测结果
+  repeated float    scores       = 4;   // 分类得分
+  repeated string   labels       = 5;   // 标签
+  bytes             raw_output   = 6;   // 原始模型输出（供高级用户自行解析）
+  int64             inference_ms = 7;   // 推理耗时（毫秒）
+  repeated Mask     masks        = 8;   // 实例分割掩码（与 detections 按下标对应）
+  repeated KeyPoint keypoints    = 9;   // 关键点
+}
+
+message BoundingBox {
+  float x      = 1;
+  float y      = 2;
+  float width  = 3;
+  float height = 4;
+  float score  = 5;
+  string label = 6;
+}
+
+message Mask {
+  int32 width  = 1;
+  int32 height = 2;
+  bytes data   = 3;   // 二值掩码（0/1），按行优先存储，共 width*height 字节
+}
+
+message KeyPoint {
+  float x      = 1;
+  float y      = 2;
+  float score  = 3;
+  int32 label  = 4;   // 关键点类别序号
+}
+
+message UnloadModelRequest  { string model_id = 1; }
+message UnloadModelResponse { bool success = 1; }
+message HealthCheckRequest  {}
+message HealthCheckResponse { bool healthy = 1; string version = 2; }

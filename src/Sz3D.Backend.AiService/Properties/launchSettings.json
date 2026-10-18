@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "Sz3D.Backend.AiService": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:54103;http://localhost:54104"
+    }
+  }
+}

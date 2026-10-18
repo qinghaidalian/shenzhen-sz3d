@@ -1,0 +1,27 @@
+{
+  "project_type": "Robot Vision Suite / Sz3D — .NET 10 WPF 桌面应用（Nodify 节点编辑器画布），多项目解决方案，MVVM",
+  "language": "C# 13 (net10.0-windows)",
+  "build_system": "dotnet SDK / MSBuild。解决方案 d:\\kiro\\Sz3D\\Sz3D.sln。WPF 工程 UseWPF=true、Nullable=enable、ImplicitUsings=enable。Nodify 包版本 7.3.0。注意：不要用 dotnet run 启动 WPF 应用。",
+  "test_framework": "xUnit 2.9.2（含 xunit.runner.visualstudio、Microsoft.NET.Test.Sdk 17.12.0、coverlet.collector）。测试工程 Sz3D.Core.Infrastructure.Tests，全局 <Using Include=\"Xunit\"/>。",
+  "build_command": "dotnet build d:\\kiro\\Sz3D\\Sz3D.sln -c Debug  （单工程快速验证：dotnet build d:\\kiro\\Sz3D\\src\\Sz3D.Core.Infrastructure\\Sz3D.Core.Infrastructure.csproj）",
+  "test_command": "dotnet test d:\\kiro\\Sz3D\\tests\\Sz3D.Core.Infrastructure.Tests\\Sz3D.Core.Infrastructure.Tests.csproj",
+  "verification_instructions": "1) 核心改动后先 build 对应工程；2) 加/改核心逻辑后跑 Sz3D.Core.Infrastructure.Tests（基线 6 个测试全绿，不得回归）；3) WPF 改动后 build 整个 sln 确认 XAML 编译通过；4) 运行时交互（GroupingNode 置后渲染、拖 Header 平移成员、Shift 切换、resize、右键删除手感）属 needs-verification-at-implementation，本工作流只做静态验证（build 绿 + 单测通过），运行时确认留给人工在 VS/Rider 启动应用。",
+  "snapshot_or_generated_files": null,
+  "environment_constraints": "PowerShell 环境无法用反射完整加载 Nodify.dll（WPF 运行时依赖）；验证 Nodify API 时用程序集元数据字符串扫描或官方 docs，不要依赖 Assembly.GetTypes()。不要用 dotnet run 启动 WPF。",
+  "contribution_requirements": "编码规范：MVVM（ViewModel 不得引用 System.Windows.Controls 类型，可用 System.Windows.Point/Size）；私有字段 _camelCase；类型/成员 PascalCase；公共 API 必须 XML 文档注释；优先 var、record、primary constructor、集合表达式、模式匹配；集合用 ObservableCollection；可恢复失败返回 Result<T> 而非抛异常；一文件一类；测试目录镜像源码结构。核心库（Sz3D.Core.Infrastructure）不得依赖 WPF。",
+  "key_patterns": "RelayCommand<T>（Commands\\GraphCommands.cs，primary ctor，CanExecuteChanged 挂 CommandManager.RequerySuggested）；ViewModelBase.Set/OnPropertyChanged（[CallerMemberName]）；Result/Result<T>（Sz3D.Core.Infrastructure.Common，record，Ok/Fail 工厂）；NodeViewModel.Location 是 System.Windows.Point，setter 回写 Model.X/Y；AddOperator 里给 NodeViewModel.DeleteCommand 注入 new RelayCommand<object>(_ => DeleteNode(vm))；节点右键单击删除：MainWindow.xaml.cs 的 OnNodeRightButtonDown（PreviewMouseRightButtonDown → DeleteCommand.Execute(null) → e.Handled=true），XAML 中 nodify:Node 挂 PreviewMouseRightButtonDown=\"OnNodeRightButtonDown\"。Nodify 命名空间 xmlns:nodify=\"https://miroiu.github.io/nodify\"。",
+  "relevant_files": [
+    "d:\\kiro\\Sz3D\\src\\Sz3D.Core.Infrastructure\\Graph\\GraphModel.cs  （NodeModel/ConnectionModel/GraphModel，加 GroupModel 的参照）",
+    "d:\\kiro\\Sz3D\\src\\Sz3D.Core.Infrastructure\\Models\\ProjectDtos.cs  （NodeDto/GraphDto，加 GroupDto 的参照）",
+    "d:\\kiro\\Sz3D\\src\\Sz3D.Core.Infrastructure\\Common\\Result.cs  （Result/Result<T>）",
+    "d:\\kiro\\Sz3D\\tests\\Sz3D.Core.Infrastructure.Tests\\GraphModelTests.cs  （xUnit [Fact]/Assert 风格参照）",
+    "d:\\kiro\\Sz3D\\tests\\Sz3D.Core.Infrastructure.Tests\\Sz3D.Core.Infrastructure.Tests.csproj",
+    "d:\\kiro\\Sz3D\\src\\Sz3D.Presentation.WPF\\ViewModels\\NodeEditorViewModel.cs  （NodeViewModel/NodeEditorViewModel，Items 集合与命令改这里）",
+    "d:\\kiro\\Sz3D\\src\\Sz3D.Presentation.WPF\\ViewModels\\ViewModelBase.cs",
+    "d:\\kiro\\Sz3D\\src\\Sz3D.Presentation.WPF\\Commands\\GraphCommands.cs  （RelayCommand<T>）",
+    "d:\\kiro\\Sz3D\\src\\Sz3D.Presentation.WPF\\MainWindow.xaml  （NodifyEditor ItemsSource/模板/工具栏按钮）",
+    "d:\\kiro\\Sz3D\\src\\Sz3D.Presentation.WPF\\MainWindow.xaml.cs  （OnNodeRightButtonDown 复用模式）",
+    "d:\\kiro\\Sz3D\\src\\Sz3D.Presentation.WPF\\Themes\\Dark.xaml  （主题画刷：AccentColor #007ACC、HeaderBackground 等，不要改 MenuItem 模板）"
+  ],
+  "directory_structure": "src/Sz3D.Core.Infrastructure（核心库，无 WPF：Graph/、Models/、Common/、Execution/、Contracts/）；src/Sz3D.Presentation.WPF（WPF 应用：ViewModels/、Views、Commands/、Services/、Themes/、MainWindow.xaml[.cs]）；src/Sz3D.Core.Operators + Sz3D.Plugins.*（算子/插件）；tests/Sz3D.Core.Infrastructure.Tests（xUnit，镜像核心库目录）。GroupingNode 决策详情见同目录 plan.md。"
+}

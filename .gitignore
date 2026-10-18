@@ -1,0 +1,23 @@
+﻿# Build output
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+# Test results
+TestResults/
+coverage/
+
+# Runtime directories
+autosave/
+logs/
+config/
+
+# NuGet
+*.nupkg
+.nuget/
+
+# IDE
+.idea/
+*.DotSettings.user

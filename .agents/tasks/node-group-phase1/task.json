@@ -1,0 +1,7 @@
+{
+  "task_id": "task-node-group-phase1",
+  "task_description": "在 Nodify 画布上实现图漾 RVS 式的分组块（Phase 1 最小可用）：带标题、可移动、可缩放的矩形块，渲染在节点后面，节点按几何包含成为成员，移动分组平移成员（由 Nodify GroupingNode 内置提供），分组可选中并用右键单击删除（复用节点删除模式，仅删块不删成员）。核心 GroupModel/几何逻辑在 Sz3D.Core.Infrastructure（无 WPF 依赖，单测覆盖），GroupViewModel + XAML 在 WPF 工程。采用 Nodify 7.3.0 内置 GroupingNode（ZIndex=-1 自动置后、CanResize、拖 Header 经 SelectArea 整体平移成员）。",
+  "status": "completed",
+  "feature_order": ["FEAT-001", "FEAT-002"],
+  "blocked_reason": null
+}

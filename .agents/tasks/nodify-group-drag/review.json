@@ -1,0 +1,24 @@
+{
+  "verdict": "APPROVED",
+  "findings": [
+    {
+      "label": "ApplyDelta 死代码",
+      "confidence": "confirmed",
+      "blocking": false,
+      "detail": "GroupTranslation.ApplyDelta 在生产路径未被调用，VM 的 TranslateMembers 只用 Translate；ApplyDelta 及覆盖它的 4 个测试属多余。建议 TranslateMembers 改用 ApplyDelta，或删除 ApplyDelta 及对应测试以免误导。"
+    },
+    {
+      "label": "拖拽选中时序依赖手动验证",
+      "confidence": "possible",
+      "blocking": false,
+      "detail": "OnItemsDragStarted 依赖被拖分组在命令触发时 IsSelected==true。文档层面自洽（ItemsDragStartedCommand 针对 SelectedContainers 触发、IsSelected 双向绑定），但 WPF 无法无头验证实际交互时序，须按 verification.md 在 VS/Rider 手动确认成员随动、相对位置不变、结束后不回弹。"
+    },
+    {
+      "label": "VM 协调层无单测覆盖",
+      "confidence": "confirmed",
+      "blocking": false,
+      "detail": "快照、ItemsDragStarted/Completed 命令、TranslateMembers 内嵌 Nodify 交互与 System.Windows.Point，无无 UI 缝隙，仅靠构建 + 手动验证。与改动性质相符，记录为已知覆盖缺口。"
+    }
+  ],
+  "reviewDoc": "d:\\kiro\\Sz3D\\.agents\\tasks\\nodify-group-drag\\review.md"
+}
