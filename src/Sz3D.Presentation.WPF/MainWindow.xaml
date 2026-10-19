@@ -4,6 +4,8 @@
         xmlns:nodify="https://miroiu.github.io/nodify"
         xmlns:vm="clr-namespace:Sz3D.Presentation.WPF.ViewModels"
         xmlns:svc="clr-namespace:Sz3D.Presentation.WPF.Services"
+        xmlns:avalondock="https://github.com/Dirkster99/AvalonDock"
+        xmlns:avalondockTheme="clr-namespace:AvalonDock.Themes;assembly=AvalonDock.Themes.VS2013"
         Title="Sz3D — 3D 视觉编程平台"
         Height="780" Width="1360"
         WindowStartupLocation="CenterScreen"
@@ -70,15 +72,16 @@
         </DataTemplate>
     </Window.Resources>
 
+    <!-- 根布局：两行 Grid（钉死，Finding 4）。
+         Row0 = 顶部 chrome（Auto），Row1 = DockingManager（*）。
+         根 Grid 不设 DataContext，继承 Window 的 MainViewModel（Finding 3）。 -->
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*" MinHeight="200"/>
-            <RowDefinition Height="5"/>
-            <RowDefinition Height="150" MinHeight="60"/>
+            <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- ══════════ 顶部：菜单栏 + 工具栏 + 状态 ══════════ -->
+        <!-- ══════════ 顶部 chrome：菜单栏 + 工具栏 + 状态（固定顶部，DockingManager 外部，逐字保留） ══════════ -->
         <DockPanel Grid.Row="0" Background="{StaticResource PrimaryBackground}">
             <Menu DockPanel.Dock="Top" Background="Transparent" Foreground="{StaticResource PrimaryForeground}">
                 <MenuItem Header="文件">
@@ -120,259 +123,285 @@
             </DockPanel>
         </DockPanel>
 
-        <!-- ══════════ 中部：3D·2D 视口 | 算子图 | 工具箱 ══════════ -->
-        <Grid Grid.Row="1">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"    MinWidth="180"/>
-                <ColumnDefinition Width="5"/>
-                <ColumnDefinition Width="1.5*" MinWidth="300"/>
-                <ColumnDefinition Width="5"/>
-                <ColumnDefinition Width="300"  MinWidth="200"/>
-            </Grid.ColumnDefinitions>
+        <!-- ══════════ 可停靠区：DockingManager 填满剩余 ══════════ -->
+        <avalondock:DockingManager Grid.Row="1" x:Name="DockManager">
+            <avalondock:DockingManager.Theme>
+                <avalondockTheme:Vs2013DarkTheme/>
+            </avalondock:DockingManager.Theme>
 
-            <!-- 竖直分隔条 1：视口 | 算子图 -->
-            <GridSplitter Grid.Column="1" Width="5"
-                          HorizontalAlignment="Center" VerticalAlignment="Stretch"
-                          ResizeBehavior="PreviousAndNext" ResizeDirection="Columns"/>
+            <avalondock:LayoutRoot>
+                <!-- 顶层 Vertical：三列工作区（上） + 日志（下），对应今日 Grid 的 row1/row3 -->
+                <avalondock:LayoutPanel Orientation="Vertical">
 
-            <!-- 竖直分隔条 2：算子图 | 工具箱 -->
-            <GridSplitter Grid.Column="3" Width="5"
-                          HorizontalAlignment="Center" VerticalAlignment="Stretch"
-                          ResizeBehavior="PreviousAndNext" ResizeDirection="Columns"/>
+                    <!-- 上部 Horizontal：视图 | 算子图 | 工具箱，对应今日 row1 的三列 -->
+                    <avalondock:LayoutPanel Orientation="Horizontal">
 
-            <!-- 左列：3D/2D 视口（切换 Tab 样式，与 RVS 一致） -->
-            <TabControl Grid.Column="0" Background="#111214">
-                <TabItem Header="3D 视图">
-                    <Grid Background="#111214">
-                        <Viewport3D x:Name="CloudViewport">
-                            <Viewport3D.Camera>
-                                <PerspectiveCamera Position="0.5 0.5 2.2" LookDirection="0 0 -1"
-                                                   UpDirection="0 1 0" FieldOfView="60"/>
-                            </Viewport3D.Camera>
-                            <ModelVisual3D x:Name="CloudVisual"/>
-                            <ModelVisual3D>
-                                <ModelVisual3D.Content>
-                                    <Model3DGroup>
-                                        <AmbientLight Color="#888888"/>
-                                        <DirectionalLight Color="#FFFFFF" Direction="-1 -1 -1"/>
-                                    </Model3DGroup>
-                                </ModelVisual3D.Content>
-                            </ModelVisual3D>
-                        </Viewport3D>
-                        <TextBlock Text="无点云输出" Foreground="#707070" FontSize="13"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding Editor.HasCloudOutput}" Value="True">
-                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
-                    </Grid>
-                </TabItem>
-                <TabItem Header="2D 视图">
-                    <Grid Background="#111214">
-                        <Image Source="{Binding Editor.ImageOutput}" Stretch="Uniform"/>
-                        <TextBlock Text="无图像输出" Foreground="#707070" FontSize="13"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding Editor.HasImageOutput}" Value="True">
-                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
-                    </Grid>
-                </TabItem>
-            </TabControl>
+                        <!-- 左列：3D/2D 两个独立面板放在同一 pane 内，初始合并为一个 Tab 组
+                             （DockMinWidth=180 复刻今日左列 MinWidth）。3D 声明在前、默认选中。 -->
+                        <avalondock:LayoutAnchorablePane DockMinWidth="180">
+                            <!-- 3D 视图：独立可停靠面板（CanFloat 默认 true，可浮动）；
+                                 IsSelected/IsActive 显式初始选中，不依赖 pane 默认选首项 -->
+                            <avalondock:LayoutAnchorable Title="3D 视图"
+                                                         ContentId="panel.view3d"
+                                                         CanClose="False"
+                                                         CanHide="True"
+                                                         IsSelected="True"
+                                                         IsActive="True">
+                                <Grid Background="#111214">
+                                    <Viewport3D x:Name="CloudViewport">
+                                        <Viewport3D.Camera>
+                                            <PerspectiveCamera Position="0.5 0.5 2.2" LookDirection="0 0 -1"
+                                                               UpDirection="0 1 0" FieldOfView="60"/>
+                                        </Viewport3D.Camera>
+                                        <ModelVisual3D x:Name="CloudVisual"/>
+                                        <ModelVisual3D>
+                                            <ModelVisual3D.Content>
+                                                <Model3DGroup>
+                                                    <AmbientLight Color="#888888"/>
+                                                    <DirectionalLight Color="#FFFFFF" Direction="-1 -1 -1"/>
+                                                </Model3DGroup>
+                                            </ModelVisual3D.Content>
+                                        </ModelVisual3D>
+                                    </Viewport3D>
+                                    <TextBlock Text="无点云输出" Foreground="#707070" FontSize="13"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Editor.HasCloudOutput}" Value="True">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </Grid>
+                            </avalondock:LayoutAnchorable>
 
-            <!-- 中列：算子图（Nodify 节点画布） -->
-            <nodify:NodifyEditor x:Name="Editor" Grid.Column="2"
-                                 DataContext="{Binding Editor}"
-                                 ItemsSource="{Binding Items}"
-                                 Connections="{Binding Connections}"
-                                 PendingConnection="{Binding PendingConnection}"
-                                 ConnectionTemplate="{StaticResource ConnectionTemplate}"
-                                 PendingConnectionTemplate="{StaticResource PendingConnectionTemplate}"
-                                 ItemContainerStyle="{StaticResource ItemContainerStyle}"
-                                 ItemsDragStartedCommand="{Binding ItemsDragStartedCommand}"
-                                 ItemsDragCompletedCommand="{Binding ItemsDragCompletedCommand}"
-                                 Background="#222325"
-                                 GridCellSize="15"
-                                 AllowDrop="True"
-                                 Drop="OnDropOperator">
-                <nodify:NodifyEditor.Resources>
-                    <DataTemplate DataType="{x:Type vm:NodeViewModel}">
-                        <!-- 单击右键弹出菜单，点「删除节点」确认删除 -->
-                        <nodify:Node Header="{Binding Title}"
-                                     Input="{Binding Input}"
-                                     Output="{Binding Output}">
-                            <nodify:Node.ContextMenu>
-                                <ContextMenu>
-                                    <MenuItem Header="删除节点" Command="{Binding DeleteCommand}"/>
-                                </ContextMenu>
-                            </nodify:Node.ContextMenu>
-                        </nodify:Node>
-                    </DataTemplate>
+                            <!-- 2D 视图：独立可停靠面板（CanFloat 默认 true，可浮动） -->
+                            <avalondock:LayoutAnchorable Title="2D 视图"
+                                                         ContentId="panel.view2d"
+                                                         CanClose="False"
+                                                         CanHide="True">
+                                <Grid Background="#111214">
+                                    <Image Source="{Binding Editor.ImageOutput}" Stretch="Uniform"/>
+                                    <TextBlock Text="无图像输出" Foreground="#707070" FontSize="13"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Editor.HasImageOutput}" Value="True">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </Grid>
+                            </avalondock:LayoutAnchorable>
+                        </avalondock:LayoutAnchorablePane>
 
-                    <!-- 分组块：Nodify 内置 GroupingNode，ZIndex=-1 自动置于节点之后；
-                         拖 Header 整体平移成员，单击右键弹菜单删除分组 -->
-                    <DataTemplate DataType="{x:Type vm:GroupViewModel}">
-                        <nodify:GroupingNode Header="{Binding Title}"
-                                             ActualSize="{Binding Size, Mode=TwoWay}"
-                                             CanResize="True"
-                                             MovementMode="Self"
-                                             HeaderBrush="#0E639C">
-                            <nodify:GroupingNode.ContextMenu>
-                                <ContextMenu>
-                                    <MenuItem Header="删除分组" Command="{Binding DeleteCommand}"/>
-                                </ContextMenu>
-                            </nodify:GroupingNode.ContextMenu>
-                        </nodify:GroupingNode>
-                    </DataTemplate>
+                        <!-- 中央：算子图作为中央文档窗格（其余面板围绕其停靠），不设固定宽、吃剩余 *，DockMinWidth=300 复刻今日中列 MinWidth -->
+                        <avalondock:LayoutDocumentPaneGroup>
+                            <avalondock:LayoutDocumentPane DockMinWidth="300">
+                                <avalondock:LayoutDocument Title="算子图"
+                                                           ContentId="panel.graph"
+                                                           CanClose="False"
+                                                           CanFloat="False">
+                                    <!-- 中列：算子图（Nodify 节点画布） -->
+                                    <nodify:NodifyEditor x:Name="Editor"
+                                                         DataContext="{Binding Editor}"
+                                                         ItemsSource="{Binding Items}"
+                                                         Connections="{Binding Connections}"
+                                                         PendingConnection="{Binding PendingConnection}"
+                                                         ConnectionTemplate="{StaticResource ConnectionTemplate}"
+                                                         PendingConnectionTemplate="{StaticResource PendingConnectionTemplate}"
+                                                         ItemContainerStyle="{StaticResource ItemContainerStyle}"
+                                                         ItemsDragStartedCommand="{Binding ItemsDragStartedCommand}"
+                                                         ItemsDragCompletedCommand="{Binding ItemsDragCompletedCommand}"
+                                                         Background="#222325"
+                                                         GridCellSize="15"
+                                                         AllowDrop="True"
+                                                         Drop="OnDropOperator">
+                                        <nodify:NodifyEditor.Resources>
+                                            <DataTemplate DataType="{x:Type vm:NodeViewModel}">
+                                                <!-- 单击右键弹出菜单，点「删除节点」确认删除 -->
+                                                <nodify:Node Header="{Binding Title}"
+                                                             Input="{Binding Input}"
+                                                             Output="{Binding Output}">
+                                                    <nodify:Node.ContextMenu>
+                                                        <ContextMenu>
+                                                            <MenuItem Header="删除节点" Command="{Binding DeleteCommand}"/>
+                                                        </ContextMenu>
+                                                    </nodify:Node.ContextMenu>
+                                                </nodify:Node>
+                                            </DataTemplate>
 
-                    <!-- 连接点：把 Anchor 回写到 VM，供连线使用 -->
-                    <Style TargetType="{x:Type nodify:NodeInput}" BasedOn="{StaticResource OriginalNodeInputStyle}">
-                        <Setter Property="Header" Value="{Binding Title}"/>
-                        <Setter Property="IsConnected" Value="{Binding IsConnected}"/>
-                        <Setter Property="Anchor" Value="{Binding Anchor, Mode=OneWayToSource}"/>
-                        <Setter Property="Foreground" Value="{StaticResource PrimaryForeground}"/>
-                    </Style>
-                    <Style TargetType="{x:Type nodify:NodeOutput}" BasedOn="{StaticResource OriginalNodeOutputStyle}">
-                        <Setter Property="Header" Value="{Binding Title}"/>
-                        <Setter Property="IsConnected" Value="{Binding IsConnected}"/>
-                        <Setter Property="Anchor" Value="{Binding Anchor, Mode=OneWayToSource}"/>
-                        <Setter Property="Foreground" Value="{StaticResource PrimaryForeground}"/>
-                    </Style>
-                </nodify:NodifyEditor.Resources>
+                                            <!-- 分组块：Nodify 内置 GroupingNode，ZIndex=-1 自动置于节点之后；
+                                                 拖 Header 整体平移成员，单击右键弹菜单删除分组 -->
+                                            <DataTemplate DataType="{x:Type vm:GroupViewModel}">
+                                                <nodify:GroupingNode Header="{Binding Title}"
+                                                                     ActualSize="{Binding Size, Mode=TwoWay}"
+                                                                     CanResize="True"
+                                                                     MovementMode="Self"
+                                                                     HeaderBrush="#0E639C">
+                                                    <nodify:GroupingNode.ContextMenu>
+                                                        <ContextMenu>
+                                                            <MenuItem Header="删除分组" Command="{Binding DeleteCommand}"/>
+                                                        </ContextMenu>
+                                                    </nodify:GroupingNode.ContextMenu>
+                                                </nodify:GroupingNode>
+                                            </DataTemplate>
 
-                <nodify:NodifyEditor.InputBindings>
-                    <KeyBinding Key="Delete" Command="{Binding DeleteSelectedCommand}"/>
-                </nodify:NodifyEditor.InputBindings>
-            </nodify:NodifyEditor>
+                                            <!-- 连接点：把 Anchor 回写到 VM，供连线使用 -->
+                                            <Style TargetType="{x:Type nodify:NodeInput}" BasedOn="{StaticResource OriginalNodeInputStyle}">
+                                                <Setter Property="Header" Value="{Binding Title}"/>
+                                                <Setter Property="IsConnected" Value="{Binding IsConnected}"/>
+                                                <Setter Property="Anchor" Value="{Binding Anchor, Mode=OneWayToSource}"/>
+                                                <Setter Property="Foreground" Value="{StaticResource PrimaryForeground}"/>
+                                            </Style>
+                                            <Style TargetType="{x:Type nodify:NodeOutput}" BasedOn="{StaticResource OriginalNodeOutputStyle}">
+                                                <Setter Property="Header" Value="{Binding Title}"/>
+                                                <Setter Property="IsConnected" Value="{Binding IsConnected}"/>
+                                                <Setter Property="Anchor" Value="{Binding Anchor, Mode=OneWayToSource}"/>
+                                                <Setter Property="Foreground" Value="{StaticResource PrimaryForeground}"/>
+                                            </Style>
+                                        </nodify:NodifyEditor.Resources>
 
-            <!-- 右列：工具箱 -->
-            <TabControl Grid.Column="4">
-                <TabItem Header="属性面板">
-                    <Grid>
-                        <TextBlock Text="选中节点后显示可编辑参数" Foreground="{StaticResource MutedForeground}"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding Editor.SelectedNode}" Value="{x:Null}">
-                                            <Setter Property="Visibility" Value="Visible"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
+                                        <nodify:NodifyEditor.InputBindings>
+                                            <KeyBinding Key="Delete" Command="{Binding DeleteSelectedCommand}"/>
+                                        </nodify:NodifyEditor.InputBindings>
+                                    </nodify:NodifyEditor>
+                                </avalondock:LayoutDocument>
+                            </avalondock:LayoutDocumentPane>
+                        </avalondock:LayoutDocumentPaneGroup>
 
-                        <ScrollViewer VerticalScrollBarVisibility="Auto">
-                            <StackPanel DataContext="{Binding Editor.SelectedNode}" Margin="10">
-                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="13.5"
-                                           Foreground="{StaticResource PrimaryForeground}" Margin="0 0 0 10"/>
-                                <ItemsControl ItemsSource="{Binding Parameters}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate DataType="{x:Type vm:ParameterViewModel}">
-                                            <Grid Margin="0 3">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                </Grid.ColumnDefinitions>
-                                                <TextBlock Text="{Binding Name}" VerticalAlignment="Center"
-                                                           Foreground="{StaticResource PrimaryForeground}"
-                                                           Margin="0 0 8 0" TextTrimming="CharacterEllipsis"/>
-                                                <TextBox Grid.Column="1" Width="130" Text="{Binding Text}"
-                                                         VerticalAlignment="Center">
-                                                    <TextBox.Style>
-                                                        <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding IsBool}" Value="True">
-                                                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </TextBox.Style>
-                                                </TextBox>
-                                                <CheckBox Grid.Column="1" IsChecked="{Binding BoolValue}"
-                                                          VerticalAlignment="Center" HorizontalAlignment="Right"
-                                                          Foreground="{StaticResource PrimaryForeground}">
-                                                    <CheckBox.Style>
-                                                        <Style TargetType="CheckBox">
-                                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding IsBool}" Value="True">
-                                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </CheckBox.Style>
-                                                </CheckBox>
-                                            </Grid>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </StackPanel>
-                        </ScrollViewer>
-                    </Grid>
-                </TabItem>
-                <TabItem Header="算子树状图">
-                    <TextBlock Text="算子树（占位）" Foreground="{StaticResource MutedForeground}" Margin="12"/>
-                </TabItem>
-                <TabItem Header="算子列表">
-                    <DockPanel Margin="6">
-                        <DockPanel DockPanel.Dock="Top" Margin="0 0 0 6">
-                            <Button DockPanel.Dock="Right" Content="更新" Margin="6 0 0 0"/>
-                            <TextBox Text="查找算子…" Foreground="{StaticResource MutedForeground}"/>
-                        </DockPanel>
-                        <ScrollViewer VerticalScrollBarVisibility="Auto">
-                            <ItemsControl ItemsSource="{Binding OperatorGroups}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Expander Header="{Binding Title}" IsExpanded="True" Margin="0 2">
-                                            <ItemsControl ItemsSource="{Binding Items}"/>
-                                        </Expander>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </ScrollViewer>
-                    </DockPanel>
-                </TabItem>
-                <TabItem Header="调试面板">
-                    <TextBlock Text="调试面板（占位）" Foreground="{StaticResource MutedForeground}" Margin="12"/>
-                </TabItem>
-            </TabControl>
-        </Grid>
+                        <!-- 右列：工具箱（固定宽 300，DockMinWidth=200 复刻今日右列 MinWidth） -->
+                        <avalondock:LayoutAnchorablePane DockWidth="300" DockMinWidth="200">
+                            <avalondock:LayoutAnchorable Title="工具箱"
+                                                         ContentId="panel.toolbox"
+                                                         CanClose="False"
+                                                         CanHide="True">
+                                <!-- 右列：工具箱 -->
+                                <TabControl>
+                                    <TabItem Header="属性面板">
+                                        <Grid>
+                                            <TextBlock Text="选中节点后显示可编辑参数" Foreground="{StaticResource MutedForeground}"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Editor.SelectedNode}" Value="{x:Null}">
+                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
 
-        <!-- 水平分隔条：拖动调整日志面板高度 -->
-        <GridSplitter Grid.Row="2" Height="5"
-                      HorizontalAlignment="Stretch" VerticalAlignment="Center"
-                      ResizeBehavior="PreviousAndNext" ResizeDirection="Rows"/>
+                                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                                <StackPanel DataContext="{Binding Editor.SelectedNode}" Margin="10">
+                                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="13.5"
+                                                               Foreground="{StaticResource PrimaryForeground}" Margin="0 0 0 10"/>
+                                                    <ItemsControl ItemsSource="{Binding Parameters}">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate DataType="{x:Type vm:ParameterViewModel}">
+                                                                <Grid Margin="0 3">
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="*"/>
+                                                                        <ColumnDefinition Width="Auto"/>
+                                                                    </Grid.ColumnDefinitions>
+                                                                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center"
+                                                                               Foreground="{StaticResource PrimaryForeground}"
+                                                                               Margin="0 0 8 0" TextTrimming="CharacterEllipsis"/>
+                                                                    <TextBox Grid.Column="1" Width="130" Text="{Binding Text}"
+                                                                             VerticalAlignment="Center">
+                                                                        <TextBox.Style>
+                                                                            <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Binding="{Binding IsBool}" Value="True">
+                                                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </TextBox.Style>
+                                                                    </TextBox>
+                                                                    <CheckBox Grid.Column="1" IsChecked="{Binding BoolValue}"
+                                                                              VerticalAlignment="Center" HorizontalAlignment="Right"
+                                                                              Foreground="{StaticResource PrimaryForeground}">
+                                                                        <CheckBox.Style>
+                                                                            <Style TargetType="CheckBox">
+                                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Binding="{Binding IsBool}" Value="True">
+                                                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </CheckBox.Style>
+                                                                    </CheckBox>
+                                                                </Grid>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </StackPanel>
+                                            </ScrollViewer>
+                                        </Grid>
+                                    </TabItem>
+                                    <TabItem Header="算子树状图">
+                                        <TextBlock Text="算子树（占位）" Foreground="{StaticResource MutedForeground}" Margin="12"/>
+                                    </TabItem>
+                                    <TabItem Header="算子列表">
+                                        <DockPanel Margin="6">
+                                            <DockPanel DockPanel.Dock="Top" Margin="0 0 0 6">
+                                                <Button DockPanel.Dock="Right" Content="更新" Margin="6 0 0 0"/>
+                                                <TextBox Text="查找算子…" Foreground="{StaticResource MutedForeground}"/>
+                                            </DockPanel>
+                                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                                <ItemsControl ItemsSource="{Binding OperatorGroups}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Expander Header="{Binding Title}" IsExpanded="True" Margin="0 2">
+                                                                <ItemsControl ItemsSource="{Binding Items}"/>
+                                                            </Expander>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </ScrollViewer>
+                                        </DockPanel>
+                                    </TabItem>
+                                    <TabItem Header="调试面板">
+                                        <TextBlock Text="调试面板（占位）" Foreground="{StaticResource MutedForeground}" Margin="12"/>
+                                    </TabItem>
+                                </TabControl>
+                            </avalondock:LayoutAnchorable>
+                        </avalondock:LayoutAnchorablePane>
+                    </avalondock:LayoutPanel>
 
-        <!-- ══════════ 底部：日志视图 ══════════ -->
-        <DataGrid Grid.Row="3"
-                  ItemsSource="{Binding Logs}"
-                  AutoGenerateColumns="False"
-                  IsReadOnly="True">
-            <DataGrid.Columns>
-                <DataGridTextColumn Header="时间戳"    Binding="{Binding Timestamp}" Width="190"/>
-                <DataGridTextColumn Header="通道"      Binding="{Binding Channel}"   Width="130"/>
-                <DataGridTextColumn Header="安全级别"  Binding="{Binding Level}"     Width="80"/>
-                <DataGridTextColumn Header="消息"      Binding="{Binding Message}"   Width="*"/>
-            </DataGrid.Columns>
-        </DataGrid>
+                    <!-- 底部：日志（固定高 150，DockMinHeight=60 复刻今日日志 Row MinHeight） -->
+                    <avalondock:LayoutAnchorablePane DockHeight="150" DockMinHeight="60">
+                        <avalondock:LayoutAnchorable Title="日志"
+                                                     ContentId="panel.log"
+                                                     CanClose="False"
+                                                     CanHide="True">
+                            <!-- 底部：日志视图 -->
+                            <DataGrid ItemsSource="{Binding Logs}"
+                                      AutoGenerateColumns="False"
+                                      IsReadOnly="True">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="时间戳"    Binding="{Binding Timestamp}" Width="190"/>
+                                    <DataGridTextColumn Header="通道"      Binding="{Binding Channel}"   Width="130"/>
+                                    <DataGridTextColumn Header="安全级别"  Binding="{Binding Level}"     Width="80"/>
+                                    <DataGridTextColumn Header="消息"      Binding="{Binding Message}"   Width="*"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </avalondock:LayoutAnchorable>
+                    </avalondock:LayoutAnchorablePane>
+                </avalondock:LayoutPanel>
+            </avalondock:LayoutRoot>
+        </avalondock:DockingManager>
     </Grid>
 </Window>
-
-
-
