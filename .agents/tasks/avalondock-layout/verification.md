@@ -8,6 +8,32 @@
 
 ---
 
+## 第二次迭代 — 修复评审 finding（提交不自包含）
+
+评审 `review.json` 指出 blocking finding：上一次提交 `6dd1a89` 仅含两个 MainWindow 文件 +
+verification.md，但这两文件硬依赖的 `Dirkster.AvalonDock` / `Dirkster.AvalonDock.Themes.VS2013`
+5.0.1 两条 `PackageReference` 只以**未提交**的工作区改动停留在 `Sz3D.Presentation.WPF.csproj`，
+导致被评审提交隔离构建会因缺少 AvalonDock 程序集而失败。
+
+修复：将 `Sz3D.Presentation.WPF.csproj` 的两条 AvalonDock 包引用（`Dirkster.AvalonDock` 5.0.1、
+`Dirkster.AvalonDock.Themes.VS2013` 5.0.1，均为精确固定版本）纳入提交，使本特性自包含、可独立编译。
+MainWindow 两文件内容未变（上次迭代已与 design §2.4/§2.5/§2.6/§2.10 及强制要求①②逐条吻合）。
+
+第二次迭代构建复核（工作目录 `d:\kiro\Sz3D`）：
+
+```
+dotnet build Sz3D.sln -c Debug
+```
+
+结论：**通过**。`在 6.5 秒内生成 成功，出现 1 警告`——该唯一警告为既存的
+`StepExecutionController.cs(6,61): warning CS9113: 参数"engine"未读`，位于未被本特性触及的
+`Sz3D.Core.Infrastructure` 项目，非本次改动引入、非新增警告。两个 MainWindow 文件与 csproj 均无
+告警或错误。关键产物：`src/Sz3D.Presentation.WPF/bin/Debug/net10.0-windows/Sz3D.Presentation.WPF.dll`。
+
+运行时冒烟（2.a/2.b/2.c）结论沿用上一次迭代（代码与布局逻辑未变，仅补齐包引用），此处不重跑。
+
+---
+
 ## 1. 构建门禁 G-1（AC-8）
 
 命令（工作目录 `d:\kiro\Sz3D`）：
