@@ -1,0 +1,20 @@
+{
+  "verdict": "APPROVED",
+  "findings": [
+    {
+      "severity": "non-blocking",
+      "confidence": "confirmed",
+      "label": "csproj 新增 AvalonDock 包引用，字面越出『仅两文件』约束",
+      "detail": "本轮 diff（基线 ab974c1 → HEAD 6031ffb）触及 Sz3D.Presentation.WPF.csproj，新增两条精确固定版本的包引用 Dirkster.AvalonDock 5.0.1 与 Dirkster.AvalonDock.Themes.VS2013 5.0.1。csproj 不在 verification.md/plan.md/layout.xml 豁免集内，字面违反『仅允许改动 MainWindow.xaml 与 MainWindow.xaml.cs 两文件』。但这是第一轮评审（review.json，CHANGES_REQUESTED）唯一 blocking finding 的既定修复：两 MainWindow 文件硬依赖 AvalonDock 命名空间与程序集，而真实基线 ab974c1 是纯 Grid+TabControl、csproj 仅含 Nodify、无 AvalonDock、无集中包管理，故本特性客观上无法在『只改两文件』前提下编译自包含；第一轮已明确把『是否接受该 csproj 改动』交编排者裁定。把它重新作为 blocking 会使评审循环无法收敛（修与不修都 blocking），且该改动最小、必要、版本固定、无副作用，故判为非阻断。若编排者偏好，可将 AvalonDock 依赖迁至 Directory.Build.props/Directory.Packages.props 承载。",
+      "location": "src/Sz3D.Presentation.WPF/Sz3D.Presentation.WPF.csproj（第 11-12 行新增两条 PackageReference）"
+    },
+    {
+      "severity": "info",
+      "confidence": "confirmed",
+      "label": "评审基线无 panel.view 中间态，判据按最终态核对",
+      "detail": "评审基线 ab974c1 是纯 Grid+TabControl 版本（MainWindow.xaml 355 行无 AvalonDock、无任何 panel.* ContentId；MainWindow.xaml.cs 仅 50 行、无布局持久化框架）。design §1.1 描述的『现状：单一 panel.view + 内嵌 TabControl』这一中间态从未出现在已提交历史，整套 AvalonDock 布局与持久化框架由本特性两次提交一次性引入。因此判据 1/7/8 中以『删除 panel.view/删 IdView/四块→五块』形式表达的 delta 在 diff 里看不到对应删除行；核对改为验证最终态等价于目标结构，并确认不该存在的符号（panel.view/IdView/_viewHost/四块/AllowFloatingWindows）在最终文件 0 残留。两类核对均通过，非问题。",
+      "location": "基线 ab974c1 vs HEAD"
+    }
+  ],
+  "reviewDoc": "d:\\kiro\\Sz3D\\.agents\\tasks\\avalondock-layout/review.md"
+}

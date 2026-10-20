@@ -1,0 +1,50 @@
+{
+  "verdict": "CHANGES_REQUESTED",
+  "reviewDoc": "d:\\kiro\\Sz3D\\.agents\\tasks\\avalondock-layout\\design-review.md",
+  "findings": [
+    {
+      "id": 1,
+      "severity": "MEDIUM",
+      "title": "迁移回退路径的 live 内容重挂安全性仍属运行时假设，且 DetachFromCurrentParent 不覆盖跨树残留父",
+      "location": "§2.6 论证 A / INV-2 / EC-3",
+      "problem": "旧 panel.view 布局触发回退时，_view3dHost/_view2dHost 从未进入新树，DetachFromCurrentParent(host, root) 只在新 root 内查找残留父，无法处理 host 仍挂在已被 Layout setter 换下的旧树这一新引入的拓扑；『重挂不抛元素已是另一元素子级』依赖未静态证实的运行时行为。",
+      "fix": "方案 A：将 M-8 冒烟（放仅含 panel.view 的 layout.xml 启动，仓库已存在该文件）由兜底提升为 blocking 验收门禁，并规定一旦观察到重挂异常立即启用论证 B。方案 B（更稳）：在 ResetToDefaultLayout 的 ① 之后 ② 之前，对五块 host 逐个 (host as FrameworkElement)?.Parent as ContentControl -> Content=null 显式 detach，并在 §2.5 改动清单新增该条（当前清单声明不新增条目，需同步）。"
+    },
+    {
+      "id": 2,
+      "severity": "MEDIUM",
+      "title": "初始选中 3D 标签依赖未证实的 LayoutAnchorablePane 默认选首项行为，缺确定性兜底",
+      "location": "§2.2 / FR-3 / AC-1 / 附录 Finding 7",
+      "problem": "设计称无需显式 IsSelected/IsActive、依赖 pane 默认选中首个子项使 3D 初始可见；该默认行为未经 IL 证实，且现存 layout.xml 中每个 LayoutAnchorable 均显式带 IsSelected=true，表明选中态是显式持久化属性，默认未必落在首项。若默认非 3D，AC-1 不达成。",
+      "fix": "在 3D 的 LayoutAnchorable 上显式写 IsSelected=\"True\"（必要时并 IsActive=\"True\"），§2.2 改为显式声明保证确定性、§2.10 XAML 清单第 1 条同步；保留 M-1 冒烟做最终确认。该属性仅影响默认/回退布局初始呈现，不与 AC-6 恢复用户布局冲突。"
+    },
+    {
+      "id": 3,
+      "severity": "NIT",
+      "title": "AC-6 浮动/隐藏面板仍算存在的语义未在验收层写死",
+      "location": "AC-6 / EC-1 / EC-2 / §2.8",
+      "problem": "浮动或隐藏态面板经 EnumerateContents(Descendents()) 仍通过必需面板校验，是现有机制，但未把『浮动/隐藏某视图面板后重启仍恢复、不误判缺失回退』列为显式验收点。",
+      "fix": "§2.9 补 M-9：把 3D 或 2D 浮动为独立窗口后正常退出，重启应恢复浮动态、不触发必需面板缺失回退。无需改代码。"
+    }
+  ],
+  "verifiedAssumptions": [
+    "AvalonDock 5.0.1 / Nodify 7.3.0 与 csproj 引用一致",
+    "CanFloat 在基类 LayoutContent 上(Boolean 可写)，LayoutDocument/LayoutAnchorable 均继承；_canFloat 字段存在",
+    "CanFloat 构造默认 true（LayoutContent..ctor IL: ldc.i4.1; stfld _canFloat）",
+    "CanFloat 被 DockingManager.StartDraggingFloatingWindowForContent/CreateFloatingWindowCore/CreateFloatingWindowForLayoutAnchorableWithoutParent 及 LayoutItem.CanExecuteFloatCommand/LayoutAnchorableItem.CanExecuteDetachToWindowCommand 实际消费（非仅序列化字段）",
+    "CanMove 分别声明在 LayoutDocument/LayoutAnchorable 自身、与基类 CanFloat 独立，禁浮动+可停靠内移动组合成立",
+    "DockingManager.AllowFloatingWindows 存在且与 CanFloat 并列被浮动创建路径消费，必须保持默认 true",
+    "MainWindow.xaml 现状结构与设计 §1.1/§2.4 完全一致",
+    "MainWindow.xaml.cs 现状(常量/RequiredIds/缓存字段/switch/校验)与 §2.5 改动基点一致",
+    "全项目『四块』仅出现在 MainWindow.xaml.cs 行 27/36/130/136/319，§2.5 第8点可完整覆盖",
+    "仓库仅 Sz3D.Core.Operators.Tests 与 Sz3D.Core.Infrastructure.Tests，无 WPF 层测试工程（§2.9 属实）",
+    "Sz3D.sln 存在；PointCloudRenderer.BuildModel/CrashLogger/LayoutDtoMapper/LayoutRootDto/ISerializableLayoutContent 均真实可用",
+    "迁移情形真实：bin/Debug/.../config/layout.xml 实际存在且仅含 panel.view，M-8 有真实样本"
+  ],
+  "unverifiedOrWrongAssumptions": [
+    "U-1 LayoutAnchorablePane 默认选中第一个子项—未静态证实（Finding 2），且 layout.xml 显示 IsSelected 为显式持久化属性",
+    "U-2 旧布局回退时游离子树旧 presenter 已释放、重挂不触发 WPF 父冲突—运行时行为未静态证实（Finding 1），设计以 M-8+论证B兜底",
+    "U-3 CanFloat=False 阻止拖出窗口的交互终态需桌面冒烟确认（M-5）；IL 已覆盖命令与拖拽创建两路径，置信度高，设计 R-1 有退路",
+    "备注：tech-stack 规则表写 AvalonDock(Xceed)，实际为 Dirkster.AvalonDock；设计全程正确用 Dirkster，属规则文档与实仓既有出入，非本设计缺陷，不计入发现"
+  ]
+}
