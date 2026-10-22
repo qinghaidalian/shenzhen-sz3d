@@ -18,6 +18,15 @@ public sealed class CameraPlugin : INodePlugin
             Description: "图漾 Percipio 3D 相机采集节点（camport3 P/Invoke）",
             Version: "1.0.0",
             IsPhase2: false,
-            Factory: () => new TyCamera.Percipio3DCameraNode())
+            Factory: () => new TyCamera.Percipio3DCameraNode()),
+
+        new NodeTypeDescriptor(
+            TypeId: $"{PluginId}:TcpCamera",
+            Category: "相机 SDK",
+            Name: "TCP 3D 相机",
+            Description: "通过 TCP/IP 连接 3D 相机采集点云（通用协议骨架，解析逻辑待按厂商协议替换）",
+            Version: "1.0.0",
+            IsPhase2: false,
+            Factory: () => new TcpCamera.TcpCameraNode())
     ];
 }
