@@ -23,11 +23,15 @@ public partial class MainWindow : Window
     private const string IdView3D = "panel.view3d";
     private const string IdView2D = "panel.view2d";
     private const string IdGraph = "panel.graph";
-    private const string IdToolbox = "panel.toolbox";
+    private const string IdProps = "panel.props";
+    private const string IdOpTree = "panel.optree";
+    private const string IdOpList = "panel.oplist";
+    private const string IdDebug = "panel.debug";
     private const string IdLog = "panel.log";
 
-    // 必需面板集合（§5：五块全部必需，任一缺失即整体回退默认布局）
-    private static readonly string[] RequiredIds = { IdView3D, IdView2D, IdGraph, IdToolbox, IdLog };
+    // 必需面板集合（§5：八块全部必需，任一缺失即整体回退默认布局）
+    private static readonly string[] RequiredIds =
+        { IdView3D, IdView2D, IdGraph, IdProps, IdOpTree, IdOpList, IdDebug, IdLog };
 
     // ── 布局文件路径（基路径统一用 AppContext.BaseDirectory，与 CrashLogger 一致） ──
     private const string LayoutConfigDir = "config";
@@ -35,11 +39,14 @@ public partial class MainWindow : Window
     private static string LayoutPath =>
         Path.Combine(AppContext.BaseDirectory, LayoutConfigDir, LayoutFileName);
 
-    // ── 五块 live 内容缓存（反序列化后据此重新挂载） ──
+    // ── 八块 live 内容缓存（反序列化后据此重新挂载） ──
     private object? _view3dHost;
     private object? _view2dHost;
     private object? _graphHost;
-    private object? _toolboxHost;
+    private object? _propsHost;
+    private object? _opTreeHost;
+    private object? _opListHost;
+    private object? _debugHost;
     private object? _logHost;
 
     // 默认布局 XML 缓存（损坏/缺失/中途失败时的回退单一真源）
@@ -107,6 +114,75 @@ public partial class MainWindow : Window
         }
     }
 
+    // ── 视图菜单：面板显示/隐藏切换（仿图漾） ─────────────────────────────
+
+    /// <summary>
+    /// 按 <c>ContentId</c> 在当前布局树里查找可停靠面板（包含已隐藏/浮动的面板）。
+    /// 找不到返回 <c>null</c>。
+    /// </summary>
+    private LayoutAnchorable? FindAnchorable(string contentId) =>
+        DockManager.Layout.Descendents()
+            .OfType<LayoutAnchorable>()
+            .FirstOrDefault(a => a.ContentId == contentId);
+
+    /// <summary>
+    /// 面板当前是否“显示在主界面上”（存在且未被隐藏/自动隐藏）。
+    /// 未找到面板按未显示处理。
+    /// </summary>
+    private bool IsPanelVisible(string contentId)
+    {
+        var a = FindAnchorable(contentId);
+        return a is not null && a.IsVisible;
+    }
+
+    /// <summary>
+    /// 显示或隐藏指定面板。已隐藏则 <see cref="LayoutAnchorable.Show"/> 复位到主界面，
+    /// 否则 <see cref="LayoutAnchorable.Hide"/>。找不到面板则忽略（不崩溃）。
+    /// </summary>
+    private void TogglePanel(string contentId)
+    {
+        var a = FindAnchorable(contentId);
+        if (a is null) return;
+
+        if (a.IsVisible)
+            a.Hide();
+        else
+            a.Show();
+    }
+
+    /// <summary>菜单展开时，把各可切换项的勾选状态同步为面板的实际可见状态。</summary>
+    private void OnViewMenuOpened(object sender, RoutedEventArgs e)
+    {
+        MenuPanelView3D.IsChecked = IsPanelVisible(IdView3D);
+        MenuPanelView2D.IsChecked = IsPanelVisible(IdView2D);
+        // 算子图为中央文档（不可关闭），恒为显示状态
+        MenuPanelGraph.IsChecked = true;
+        MenuPanelGraph.IsEnabled = false;
+        // 工具箱四面板：勾选态同步为各自实际可见状态
+        MenuPanelProps.IsChecked = IsPanelVisible(IdProps);
+        MenuPanelOpTree.IsChecked = IsPanelVisible(IdOpTree);
+        MenuPanelOpList.IsChecked = IsPanelVisible(IdOpList);
+        MenuPanelDebug.IsChecked = IsPanelVisible(IdDebug);
+    }
+
+    private void OnTogglePanelView3D(object sender, RoutedEventArgs e) => TogglePanel(IdView3D);
+
+    private void OnTogglePanelView2D(object sender, RoutedEventArgs e) => TogglePanel(IdView2D);
+
+    private void OnTogglePanelProps(object sender, RoutedEventArgs e) => TogglePanel(IdProps);
+
+    private void OnTogglePanelOpTree(object sender, RoutedEventArgs e) => TogglePanel(IdOpTree);
+
+    private void OnTogglePanelOpList(object sender, RoutedEventArgs e) => TogglePanel(IdOpList);
+
+    private void OnTogglePanelDebug(object sender, RoutedEventArgs e) => TogglePanel(IdDebug);
+
+    private void OnTogglePanelGraph(object sender, RoutedEventArgs e)
+    {
+        // 算子图不可隐藏；点击仅保持勾选，避免误把文档从布局移除
+        MenuPanelGraph.IsChecked = true;
+    }
+
     // ── 布局持久化 ─────────────────────────────
 
     /// <summary>
@@ -130,13 +206,13 @@ public partial class MainWindow : Window
 
     /// <summary>
     /// 在 Loaded 时恢复磁盘布局。步骤顺序钉死，详见设计 §4.4：
-    /// ①抓取五块 live 缓存（必须在任何反序列化之前）→ ①a 缓存完整性断言
+    /// ①抓取八块 live 缓存（必须在任何反序列化之前）→ ①a 缓存完整性断言
     /// → ②生成默认布局 XML 缓存 → ③无磁盘文件则结束
     /// → ④反序列化磁盘布局并重挂内容 → ⑤必需面板校验。整体包 try/catch，绝不崩溃。
     /// </summary>
     private void LoadLayout()
     {
-        // ① 抓取五块 live 缓存（Loaded 时默认 XAML 布局已 inflate、五块 .Content 已建好）
+        // ① 抓取八块 live 缓存（Loaded 时默认 XAML 布局已 inflate、八块 .Content 已建好）
         foreach (var lc in EnumerateContents(DockManager.Layout))
         {
             switch (lc.ContentId)
@@ -144,16 +220,21 @@ public partial class MainWindow : Window
                 case IdView3D: _view3dHost = lc.Content; break;
                 case IdView2D: _view2dHost = lc.Content; break;
                 case IdGraph: _graphHost = lc.Content; break;
-                case IdToolbox: _toolboxHost = lc.Content; break;
+                case IdProps: _propsHost = lc.Content; break;
+                case IdOpTree: _opTreeHost = lc.Content; break;
+                case IdOpList: _opListHost = lc.Content; break;
+                case IdDebug: _debugHost = lc.Content; break;
                 case IdLog: _logHost = lc.Content; break;
             }
         }
 
         // ①a 缓存完整性断言：任一为 null 属实现期 bug，放弃持久化、保留默认布局
-        if (_view3dHost is null || _view2dHost is null || _graphHost is null || _toolboxHost is null || _logHost is null)
+        if (_view3dHost is null || _view2dHost is null || _graphHost is null ||
+            _propsHost is null || _opTreeHost is null || _opListHost is null ||
+            _debugHost is null || _logHost is null)
         {
             CrashLogger.Write(new InvalidOperationException(
-                "布局缓存抓取不完整（视图3D/视图2D/算子图/工具箱/日志 五块应齐备）：" +
+                "布局缓存抓取不完整（视图3D/视图2D/算子图/属性面板/算子树状图/算子列表/调试面板/日志 八块应齐备）：" +
                 "默认 XAML 布局未按预期 inflate 或 ContentId 不匹配，" +
                 "保留默认布局、不进行反序列化。"));
             return;
@@ -175,7 +256,7 @@ public partial class MainWindow : Window
             if (!AllRequiredPresent())
             {
                 CrashLogger.Write(new InvalidOperationException(
-                    "恢复后必需面板缺失（视图3D/视图2D/算子图/工具箱/日志），回退默认布局。"));
+                    "恢复后必需面板缺失（视图3D/视图2D/算子图/属性面板/算子树状图/算子列表/调试面板/日志），回退默认布局。"));
                 ResetToDefaultLayout();
             }
         }
@@ -233,7 +314,10 @@ public partial class MainWindow : Window
                 IdView3D => _view3dHost,
                 IdView2D => _view2dHost,
                 IdGraph => _graphHost,
-                IdToolbox => _toolboxHost,
+                IdProps => _propsHost,
+                IdOpTree => _opTreeHost,
+                IdOpList => _opListHost,
+                IdDebug => _debugHost,
                 IdLog => _logHost,
                 _ => null,
             };
@@ -261,7 +345,7 @@ public partial class MainWindow : Window
     /// 当 XML 损坏 / 反序列化中途失败 / 必需面板缺失时的回退。
     /// 单一真源为内存缓存的默认布局 XML（<see cref="_defaultLayoutXml"/>）。
     /// 步骤顺序钉死（防止在半成品布局上叠加导致重挂载冲突）：
-    /// ①整体重置 Layout 解绑所有缓存内容 → ②从默认 XML 回放 → ③回放后校验五面板齐备。
+    /// ①整体重置 Layout 解绑所有缓存内容 → ②从默认 XML 回放 → ③回放后校验八面板齐备。
     /// 全程 try/catch，连默认布局都失败时保留空布局并记 error（不崩溃、不递归回退）。
     /// </summary>
     private void ResetToDefaultLayout()
@@ -279,11 +363,15 @@ public partial class MainWindow : Window
             //    Theme 设在 DockingManager 上、不是 Layout 子树属性，替换 Layout 不影响主题。
             DockManager.Layout = new LayoutRoot();
 
-            // 显式摘除五块 live 内容残留的逻辑父，消除跨树残留父冲突：
+            // 显式摘除八块 live 内容残留的逻辑父，消除跨树残留父冲突：
             // 旧树（含上一次失败回退的 newRoot）卸下后，WPF 元素可能仍挂在已游离的
             // 内容宿主上；重挂到默认布局前先置空其父 ContentControl.Content，
             // 避免触发「元素已是另一元素的子级」异常。
-            foreach (var host in new[] { _view3dHost, _view2dHost, _graphHost, _toolboxHost, _logHost })
+            foreach (var host in new[]
+                     {
+                         _view3dHost, _view2dHost, _graphHost, _propsHost,
+                         _opTreeHost, _opListHost, _debugHost, _logHost,
+                     })
             {
                 if (host is FrameworkElement fe && fe.Parent is ContentControl cc)
                     cc.Content = null;
@@ -292,11 +380,11 @@ public partial class MainWindow : Window
             // ② 从默认 XML 回放，并重挂内容（整体替换 DockingManager.Layout）
             ApplyLayoutXml(_defaultLayoutXml);
 
-            // ③ 回放后校验：五面板齐备才算回退成功，否则保留空布局并记 error
+            // ③ 回放后校验：八面板齐备才算回退成功，否则保留空布局并记 error
             if (!AllRequiredPresent())
             {
                 CrashLogger.Write(new InvalidOperationException(
-                    "回退默认布局后仍缺失必需面板（五块），保留空布局（不崩溃）。"));
+                    "回退默认布局后仍缺失必需面板（八块），保留空布局（不崩溃）。"));
             }
         }
         catch (Exception ex)
@@ -332,7 +420,7 @@ public partial class MainWindow : Window
             .ToHashSet()!;
 
     /// <summary>
-    /// 必需面板（五块全部）是否都已挂载。
+    /// 必需面板（八块全部）是否都已挂载。
     /// </summary>
     private bool AllRequiredPresent()
     {

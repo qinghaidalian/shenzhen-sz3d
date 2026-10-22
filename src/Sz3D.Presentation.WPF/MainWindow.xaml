@@ -70,6 +70,7 @@
                 </StackPanel>
             </Border>
         </DataTemplate>
+
     </Window.Resources>
 
     <!-- 根布局：两行 Grid（钉死，Finding 4）。
@@ -92,7 +93,27 @@
                     <MenuItem Header="另存为"  Command="{Binding SaveAsCommand}"/>
                 </MenuItem>
                 <MenuItem Header="编辑"/>
-                <MenuItem Header="视图"/>
+                <MenuItem Header="视图" SubmenuOpened="OnViewMenuOpened">
+                    <MenuItem Header="窗口布局一"/>
+                    <MenuItem Header="窗口布局二"/>
+                    <MenuItem Header="窗口布局三"/>
+                    <MenuItem Header="窗口布局四"/>
+                    <Separator/>
+                    <MenuItem x:Name="MenuPanelGraph"  Header="算子图" IsCheckable="True"
+                              Click="OnTogglePanelGraph"/>
+                    <MenuItem x:Name="MenuPanelView3D" Header="3D 视图" IsCheckable="True"
+                              Click="OnTogglePanelView3D"/>
+                    <MenuItem x:Name="MenuPanelView2D" Header="2D 视图" IsCheckable="True"
+                              Click="OnTogglePanelView2D"/>
+                    <MenuItem x:Name="MenuPanelProps"  Header="属性面板" IsCheckable="True"
+                              Click="OnTogglePanelProps"/>
+                    <MenuItem x:Name="MenuPanelOpTree" Header="算子树状图" IsCheckable="True"
+                              Click="OnTogglePanelOpTree"/>
+                    <MenuItem x:Name="MenuPanelOpList" Header="算子列表" IsCheckable="True"
+                              Click="OnTogglePanelOpList"/>
+                    <MenuItem x:Name="MenuPanelDebug"  Header="调试面板" IsCheckable="True"
+                              Click="OnTogglePanelDebug"/>
+                </MenuItem>
                 <MenuItem Header="运行">
                     <MenuItem Header="运行"     Command="{Binding RunCommand}"/>
                     <MenuItem Header="单次运行" Command="{Binding RunOnceCommand}"/>
@@ -278,15 +299,18 @@
                             </avalondock:LayoutDocumentPane>
                         </avalondock:LayoutDocumentPaneGroup>
 
-                        <!-- 右列：工具箱（固定宽 300，DockMinWidth=200 复刻今日右列 MinWidth） -->
-                        <avalondock:LayoutAnchorablePane DockWidth="300" DockMinWidth="200">
-                            <avalondock:LayoutAnchorable Title="工具箱"
-                                                         ContentId="panel.toolbox"
+                        <!-- 右列：工具箱四面板（固定宽 300，DockMinWidth=240 复刻今日右列 MinWidth）。
+                             四个独立 LayoutAnchorable 放在同一 pane 内，初始合并为一个 Tab 组
+                             （与左列 3D/2D 同一机制）；各自可用 X 关闭（实为隐藏，保留在布局树中），
+                             并能从「视图」菜单逐个重新勾选显示。属性面板声明在前、默认选中。 -->
+                        <avalondock:LayoutAnchorablePane DockWidth="300" DockMinWidth="240">
+                            <!-- 属性面板：选中节点后显示可编辑参数 -->
+                            <avalondock:LayoutAnchorable Title="属性面板"
+                                                         ContentId="panel.props"
                                                          CanClose="False"
-                                                         CanHide="True">
-                                <!-- 右列：工具箱 -->
-                                <TabControl>
-                                    <TabItem Header="属性面板">
+                                                         CanHide="True"
+                                                         IsSelected="True"
+                                                         IsActive="True">
                                         <Grid>
                                             <TextBlock Text="选中节点后显示可编辑参数" Foreground="{StaticResource MutedForeground}"
                                                        HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -350,11 +374,21 @@
                                                 </StackPanel>
                                             </ScrollViewer>
                                         </Grid>
-                                    </TabItem>
-                                    <TabItem Header="算子树状图">
+                            </avalondock:LayoutAnchorable>
+
+                            <!-- 算子树状图：占位 -->
+                            <avalondock:LayoutAnchorable Title="算子树状图"
+                                                         ContentId="panel.optree"
+                                                         CanClose="False"
+                                                         CanHide="True">
                                         <TextBlock Text="算子树（占位）" Foreground="{StaticResource MutedForeground}" Margin="12"/>
-                                    </TabItem>
-                                    <TabItem Header="算子列表">
+                            </avalondock:LayoutAnchorable>
+
+                            <!-- 算子列表：可拖拽到画布的算子分组列表 -->
+                            <avalondock:LayoutAnchorable Title="算子列表"
+                                                         ContentId="panel.oplist"
+                                                         CanClose="False"
+                                                         CanHide="True">
                                         <DockPanel Margin="6">
                                             <DockPanel DockPanel.Dock="Top" Margin="0 0 0 6">
                                                 <Button DockPanel.Dock="Right" Content="更新" Margin="6 0 0 0"/>
@@ -372,11 +406,14 @@
                                                 </ItemsControl>
                                             </ScrollViewer>
                                         </DockPanel>
-                                    </TabItem>
-                                    <TabItem Header="调试面板">
+                            </avalondock:LayoutAnchorable>
+
+                            <!-- 调试面板：占位 -->
+                            <avalondock:LayoutAnchorable Title="调试面板"
+                                                         ContentId="panel.debug"
+                                                         CanClose="False"
+                                                         CanHide="True">
                                         <TextBlock Text="调试面板（占位）" Foreground="{StaticResource MutedForeground}" Margin="12"/>
-                                    </TabItem>
-                                </TabControl>
                             </avalondock:LayoutAnchorable>
                         </avalondock:LayoutAnchorablePane>
                     </avalondock:LayoutPanel>

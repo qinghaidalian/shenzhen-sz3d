@@ -72,6 +72,16 @@
                                               VerticalAlignment="Center"
                                               HorizontalAlignment="Center"/>
 
+                            <!-- 可勾选项的勾选标记（IsChecked=True 时显示，仿图漾视图菜单） -->
+                            <Path x:Name="CheckMark" Grid.Column="0"
+                                  Width="12" Height="12"
+                                  VerticalAlignment="Center" HorizontalAlignment="Center"
+                                  Stretch="Uniform"
+                                  Data="M 0 5 L 4 9 L 11 1"
+                                  Stroke="{StaticResource AccentColor}"
+                                  StrokeThickness="2"
+                                  Visibility="Collapsed"/>
+
                             <!-- 标题 -->
                             <ContentPresenter Grid.Column="1"
                                               ContentSource="Header"
@@ -130,6 +140,18 @@
                             <Setter TargetName="Bd" Property="Background" Value="{StaticResource AccentColor}"/>
                             <Setter Property="Foreground" Value="#FFFFFF"/>
                         </Trigger>
+                        <!-- 已勾选：显示勾选标记 -->
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="CheckMark" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                        <!-- 高亮时勾选标记转白，贴合高亮底色 -->
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsChecked" Value="True"/>
+                                <Condition Property="IsHighlighted" Value="True"/>
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="CheckMark" Property="Stroke" Value="#FFFFFF"/>
+                        </MultiTrigger>
                         <!-- 禁用项：灰显但仍可辨识 -->
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Foreground" Value="#6E6E6E"/>
