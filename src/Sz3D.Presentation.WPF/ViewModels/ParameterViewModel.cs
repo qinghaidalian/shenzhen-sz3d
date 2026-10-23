@@ -19,6 +19,27 @@ public sealed class ParameterViewModel : ViewModelBase
     public string Name => _prop.Name;
     public bool IsBool => _prop.PropertyType == typeof(bool);
 
+    /// <summary>
+    /// 以字符串形式读写当前参数值，供项目文件（.rvsp）持久化统一走文本通道。
+    /// bool/数值/字符串皆可，设值失败（非法输入）时静默忽略并保持原值。
+    /// </summary>
+    public string SerializedValue
+    {
+        get => _prop.GetValue(_target)?.ToString() ?? "";
+        set
+        {
+            try
+            {
+                var converted = Convert.ChangeType(value, _prop.PropertyType, CultureInfo.InvariantCulture);
+                _prop.SetValue(_target, converted);
+            }
+            catch { /* 忽略非法输入 */ }
+            // 通知界面刷新（Text / BoolValue 共享底层属性）
+            OnPropertyChanged(nameof(Text));
+            OnPropertyChanged(nameof(BoolValue));
+        }
+    }
+
     /// <summary>文本型参数（int/double/float/string 等）。</summary>
     public string Text
     {

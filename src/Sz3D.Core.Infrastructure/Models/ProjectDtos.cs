@@ -38,6 +38,9 @@ public sealed record NodeDto
     public string DisplayName { get; init; } = "";
     public double X           { get; init; }
     public double Y           { get; init; }
+
+    /// <summary>节点上 [NodeParameter] 参数的持久化键值对（参数名 → 字符串化值）。</summary>
+    public Dictionary<string, string> Parameters { get; init; } = [];
 }
 
 public sealed record ConnectionDto

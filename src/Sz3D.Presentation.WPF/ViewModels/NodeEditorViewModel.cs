@@ -202,6 +202,15 @@ public sealed class NodeEditorViewModel : ViewModelBase
             Y           = location.Y,
             Instance    = op.Factory(),
         };
+        return AddNodeInternal(op, node);
+    }
+
+    /// <summary>
+    /// 用预置的 <see cref="NodeModel"/>（已含 Id/坐标/实例）接入画布。
+    /// 供项目加载时按持久化的 Id 重建节点，确保连线能按 Id 正确还原。
+    /// </summary>
+    private NodeViewModel AddNodeInternal(OperatorDescriptor op, NodeModel node)
+    {
         _graph.AddNode(node);
 
         var vm = new NodeViewModel(node);
@@ -346,6 +355,159 @@ public sealed class NodeEditorViewModel : ViewModelBase
 
     private void RefreshSelectedNode() =>
         SelectedNode = Nodes.FirstOrDefault(n => n.IsSelected);
+
+    // ── 项目文件（.rvsp）持久化：运行时图 ↔ DTO ──────────────────
+
+    /// <summary>
+    /// 把当前画布（节点、连线、分组、各节点参数、画布视图状态）快照为可序列化的
+    /// <see cref="ProjectFile"/> DTO，供 <see cref="ProjectSerializer"/> 写入 JSON。
+    /// </summary>
+    /// <param name="projectName">项目名（通常取文件名，无扩展名）。</param>
+    public ProjectFile ToProjectFile(string projectName)
+    {
+        var nodeDtos = Nodes.Select(vm => new NodeDto
+        {
+            Id          = vm.Model.Id,
+            TypeId      = vm.Model.TypeId,
+            DisplayName = vm.Model.DisplayName,
+            X           = vm.Model.X,
+            Y           = vm.Model.Y,
+            Parameters  = vm.Parameters.ToDictionary(p => p.Name, p => p.SerializedValue),
+        }).ToList();
+
+        var connDtos = _graph.Connections.Select(c => new ConnectionDto
+        {
+            Id           = c.Id,
+            SourceNodeId = c.SourceNodeId,
+            SourcePort   = c.OutputPort.PortName,
+            TargetNodeId = c.TargetNodeId,
+            TargetPort   = c.InputPort.PortName,
+        }).ToList();
+
+        var groupDtos = Groups.Select(g => new GroupDto
+        {
+            Id     = g.Model.Id,
+            Title  = g.Model.Title,
+            X      = g.Model.X,
+            Y      = g.Model.Y,
+            Width  = g.Model.Width,
+            Height = g.Model.Height,
+            Color  = g.Model.Color,
+        }).ToList();
+
+        return new ProjectFile
+        {
+            ProjectName = projectName,
+            Graph = new GraphDto
+            {
+                Nodes       = nodeDtos,
+                Connections = connDtos,
+                Groups      = groupDtos,
+            },
+        };
+    }
+
+    /// <summary>
+    /// 清空当前画布并从 <see cref="ProjectFile"/> DTO 重建整张算子图：
+    /// 按持久化 Id 重建节点（经算子库工厂实例化并还原参数）、重连连线、重建分组。
+    /// 未知 TypeId 的节点会被跳过并通过 <paramref name="warn"/> 上报，不中断加载。
+    /// </summary>
+    /// <param name="project">已反序列化的项目 DTO。</param>
+    /// <param name="warn">加载过程中的告警回调（如遇未知节点类型）。</param>
+    public void LoadProjectFile(ProjectFile project, Action<string>? warn = null)
+    {
+        ArgumentNullException.ThrowIfNull(project);
+        Clear();
+
+        var catalog = NodeLibrary.Operators.ToDictionary(o => o.TypeId);
+
+        // 1) 重建节点（保留持久化 Id/坐标，还原参数）
+        foreach (var nd in project.Graph.Nodes)
+        {
+            if (!catalog.TryGetValue(nd.TypeId, out var op))
+            {
+                warn?.Invoke($"未知节点类型「{nd.TypeId}」，已跳过（相关连线一并忽略）。");
+                continue;
+            }
+
+            var node = new NodeModel
+            {
+                Id          = nd.Id,
+                TypeId      = nd.TypeId,
+                DisplayName = string.IsNullOrEmpty(nd.DisplayName) ? op.Name : nd.DisplayName,
+                X           = nd.X,
+                Y           = nd.Y,
+                Instance    = op.Factory(),
+            };
+            var vm = AddNodeInternal(op, node);
+
+            // 还原参数值（统一走字符串通道）
+            foreach (var pvm in vm.Parameters)
+                if (nd.Parameters.TryGetValue(pvm.Name, out var raw))
+                    pvm.SerializedValue = raw;
+        }
+
+        // 2) 重建连线（按 节点Id + 端口名 定位连接点）
+        foreach (var cd in project.Graph.Connections)
+        {
+            var from = Nodes.FirstOrDefault(n => n.Model.Id == cd.SourceNodeId);
+            var to   = Nodes.FirstOrDefault(n => n.Model.Id == cd.TargetNodeId);
+            if (from is null || to is null) continue;  // 节点被跳过时忽略其连线
+            Connect(from, cd.SourcePort, to, cd.TargetPort);
+        }
+
+        // 3) 重建分组
+        foreach (var gd in project.Graph.Groups)
+        {
+            var model = new GroupModel
+            {
+                Id     = gd.Id,
+                Title  = gd.Title,
+                X      = gd.X,
+                Y      = gd.Y,
+                Width  = gd.Width,
+                Height = gd.Height,
+                Color  = string.IsNullOrEmpty(gd.Color) ? "#0E639C" : gd.Color,
+            };
+            _graph.AddGroup(model);
+
+            var gvm = new GroupViewModel(model);
+            gvm.DeleteCommand = new RelayCommand<object>(_ => DeleteGroup(gvm));
+            gvm.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(GroupViewModel.Location))
+                    TranslateMembers(gvm);
+            };
+            Groups.Add(gvm);
+            Items.Add(gvm);
+        }
+
+        RecomputeMembership();
+        RefreshSelectedNode();
+    }
+
+    /// <summary>清空画布上的全部节点、连线、分组与派生状态（新建/加载前复位）。</summary>
+    public void Clear()
+    {
+        // 从底层图模型移除所有节点（会级联删连线）与分组
+        foreach (var n in Nodes.ToList())
+            _graph.RemoveNode(n.Model.Id);
+        foreach (var g in Groups.ToList())
+            _graph.RemoveGroup(g.Model.Id);
+
+        Nodes.Clear();
+        Groups.Clear();
+        Items.Clear();
+        Connections.Clear();
+        _membership.Clear();
+        _dragMembers.Clear();
+
+        ImageOutput = null;
+        CloudOutput = null;
+        OnPropertyChanged(nameof(HasImageOutput));
+        OnPropertyChanged(nameof(HasCloudOutput));
+        RefreshSelectedNode();
+    }
 
     // ── 执行：按拓扑序运行整图，并把输出路由到 2D/3D 视口 ────────
 
