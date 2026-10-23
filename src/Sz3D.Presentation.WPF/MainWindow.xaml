@@ -500,10 +500,18 @@
                                         <DockPanel Margin="6">
                                             <DockPanel DockPanel.Dock="Top" Margin="0 0 0 6">
                                                 <Button DockPanel.Dock="Right" Content="更新" Margin="6 0 0 0"/>
-                                                <TextBox Text="查找算子…" Foreground="{StaticResource MutedForeground}"/>
+                                                <ComboBox DockPanel.Dock="Right" Width="120" Margin="6 0 0 0"
+                                                          ItemsSource="{Binding CategoryOptions}"
+                                                          SelectedItem="{Binding SelectedCategory}"
+                                                          DisplayMemberPath="Display"
+                                                          Foreground="{StaticResource PrimaryForeground}"
+                                                          Background="{StaticResource ControlBackground}"
+                                                          BorderBrush="{StaticResource BorderColor}"/>
+                                                <TextBox Text="{Binding SearchKeyword, UpdateSourceTrigger=PropertyChanged}"
+                                                         Foreground="{StaticResource PrimaryForeground}"/>
                                             </DockPanel>
                                             <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                                <ItemsControl ItemsSource="{Binding OperatorGroups}">
+                                                <ItemsControl ItemsSource="{Binding FilteredGroups}">
                                                     <ItemsControl.ItemTemplate>
                                                         <DataTemplate>
                                                             <Expander Header="{Binding Title}" IsExpanded="True" Margin="0 2">

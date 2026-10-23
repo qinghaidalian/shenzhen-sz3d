@@ -10,11 +10,42 @@ namespace Sz3D.Presentation.WPF.ViewModels;
 /// <summary>日志视图中的一行。</summary>
 public sealed record LogEntry(string Timestamp, string Channel, string Level, string Message);
 
+/// <summary>
+/// 「算子库」下拉的一项：<paramref name="Display"/> 为显示文本，
+/// <paramref name="Category"/> 为对应算子种类；<c>Category == null</c> 表示「全部算子」（不按种类过滤）。
+/// </summary>
+/// <param name="Display">下拉中显示的文本。</param>
+/// <param name="Category">对应的算子种类；<c>null</c> 代表「全部算子」哨兵。</param>
+public sealed record CategoryOption(string Display, string? Category);
+
 /// <summary>主窗口 DataContext。</summary>
 public sealed class MainViewModel : ViewModelBase
 {
     public NodeEditorViewModel Editor { get; } = new();
-    public IReadOnlyList<OperatorGroup> OperatorGroups => NodeLibrary.Groups;
+
+    /// <summary>经「关键字 + 种类」过滤后的算子分组，供「算子列表」面板绑定展示。</summary>
+    public ObservableCollection<OperatorGroup> FilteredGroups { get; } = [];
+
+    /// <summary>「算子库」下拉可选项：首项为「全部算子」，其后为各算子种类。</summary>
+    public ObservableCollection<CategoryOption> CategoryOptions { get; } = [];
+
+    private string _searchKeyword = "";
+
+    /// <summary>查找框关键字；变化时实时重算过滤结果（不区分大小写子串匹配 Name/Description）。</summary>
+    public string SearchKeyword
+    {
+        get => _searchKeyword;
+        set { if (Set(ref _searchKeyword, value)) RebuildFilteredGroups(); }
+    }
+
+    private CategoryOption? _selectedCategory;
+
+    /// <summary>当前选中的算子种类；变化时重算过滤结果。「全部算子」时不按种类过滤。</summary>
+    public CategoryOption? SelectedCategory
+    {
+        get => _selectedCategory;
+        set { if (Set(ref _selectedCategory, value)) RebuildFilteredGroups(); }
+    }
 
     public ObservableCollection<LogEntry> Logs { get; } =
     [
@@ -55,6 +86,40 @@ public sealed class MainViewModel : ViewModelBase
         StopCommand    = new RelayCommand<object>(_ => StatusText = "已停止");
         RunOnceCommand = new RelayCommand<object>(async _ => await RunGraphAsync());
         ExitCommand    = new RelayCommand<object>(_ => System.Windows.Application.Current?.Shutdown());
+
+        // 「算子库」选项：首项「全部算子」(Category=null)，其后按现有分组顺序取各种类
+        CategoryOptions.Add(new CategoryOption("全部算子", null));
+        foreach (var group in NodeLibrary.Groups)
+            CategoryOptions.Add(new CategoryOption(group.Title, group.Title));
+
+        _selectedCategory = CategoryOptions[0];
+        RebuildFilteredGroups();
+    }
+
+    /// <summary>
+    /// 依据当前 <see cref="SelectedCategory"/> 与 <see cref="SearchKeyword"/> 重算 <see cref="FilteredGroups"/>。
+    /// 先按种类筛组（「全部算子」不筛），再对关键字做不区分大小写子串匹配（命中 Name 或 Description，
+    /// 空关键字全通过），仅保留非空组；重建的 <see cref="OperatorGroup"/> 复用原 <see cref="OperatorDescriptor"/> 实例。
+    /// 结果写回时先 <c>Clear()</c> 再逐项 <c>Add</c>，不替换集合引用以保持绑定。
+    /// </summary>
+    private void RebuildFilteredGroups()
+    {
+        var category = SelectedCategory?.Category;
+        var keyword = SearchKeyword;
+
+        var filtered = NodeLibrary.Groups
+            .Where(g => category is null || g.Title == category)
+            .Select(g => new OperatorGroup(
+                g.Title,
+                g.Items.Where(o =>
+                    keyword.Length == 0 ||
+                    o.Name.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
+                    o.Description.Contains(keyword, StringComparison.OrdinalIgnoreCase)).ToList()))
+            .Where(g => g.Items.Count > 0);
+
+        FilteredGroups.Clear();
+        foreach (var group in filtered)
+            FilteredGroups.Add(group);
     }
 
     // ── 项目：新建 / 保存 / 另存为 / 加载 ─────────────────────────
