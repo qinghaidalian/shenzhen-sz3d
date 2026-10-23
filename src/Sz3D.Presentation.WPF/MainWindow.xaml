@@ -499,16 +499,36 @@
                                                          CanHide="True">
                                         <DockPanel Margin="6">
                                             <DockPanel DockPanel.Dock="Top" Margin="0 0 0 6">
-                                                <Button DockPanel.Dock="Right" Content="更新" Margin="6 0 0 0"/>
+                                                <TextBlock DockPanel.Dock="Left" Text="查找：" VerticalAlignment="Center"
+                                                           Margin="0 0 6 0" Foreground="{StaticResource PrimaryForeground}"/>
                                                 <ComboBox DockPanel.Dock="Right" Width="120" Margin="6 0 0 0"
+                                                          VerticalAlignment="Center"
                                                           ItemsSource="{Binding CategoryOptions}"
                                                           SelectedItem="{Binding SelectedCategory}"
-                                                          DisplayMemberPath="Display"
-                                                          Foreground="{StaticResource PrimaryForeground}"
-                                                          Background="{StaticResource ControlBackground}"
-                                                          BorderBrush="{StaticResource BorderColor}"/>
-                                                <TextBox Text="{Binding SearchKeyword, UpdateSourceTrigger=PropertyChanged}"
-                                                         Foreground="{StaticResource PrimaryForeground}"/>
+                                                          DisplayMemberPath="Display"/>
+                                                <!-- 查找框 + 空值水印（仅作用于本框，不影响全局 TextBox 样式） -->
+                                                <Grid>
+                                                    <TextBox x:Name="OpListSearchBox"
+                                                             Text="{Binding SearchKeyword, UpdateSourceTrigger=PropertyChanged}"
+                                                             VerticalAlignment="Center"
+                                                             Foreground="{StaticResource PrimaryForeground}"/>
+                                                    <TextBlock Text="过滤"
+                                                               Foreground="{StaticResource MutedForeground}"
+                                                               IsHitTestVisible="False"
+                                                               VerticalAlignment="Center"
+                                                               Margin="6 0 0 0">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding Text.IsEmpty, ElementName=OpListSearchBox}" Value="True">
+                                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                </Grid>
                                             </DockPanel>
                                             <ScrollViewer VerticalScrollBarVisibility="Auto">
                                                 <ItemsControl ItemsSource="{Binding FilteredGroups}">
