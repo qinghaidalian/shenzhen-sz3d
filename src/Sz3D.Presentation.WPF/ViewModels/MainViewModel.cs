@@ -31,6 +31,7 @@ public sealed class MainViewModel : ViewModelBase
     public ICommand RunCommand     { get; }
     public ICommand StopCommand    { get; }
     public ICommand RunOnceCommand { get; }
+    public ICommand ExitCommand    { get; }
 
     public MainViewModel()
     {
@@ -41,6 +42,7 @@ public sealed class MainViewModel : ViewModelBase
         RunCommand     = new RelayCommand<object>(async _ => await RunGraphAsync());
         StopCommand    = new RelayCommand<object>(_ => StatusText = "已停止");
         RunOnceCommand = new RelayCommand<object>(async _ => await RunGraphAsync());
+        ExitCommand    = new RelayCommand<object>(_ => System.Windows.Application.Current?.Shutdown());
     }
 
     private async Task RunGraphAsync()

@@ -6,7 +6,9 @@
         xmlns:svc="clr-namespace:Sz3D.Presentation.WPF.Services"
         xmlns:avalondock="https://github.com/Dirkster99/AvalonDock"
         xmlns:avalondockTheme="clr-namespace:AvalonDock.Themes;assembly=AvalonDock.Themes.VS2013"
-        Title="Sz3D — 3D 视觉编程平台"
+        xmlns:adctrl="clr-namespace:AvalonDock.Controls;assembly=AvalonDock"
+        Title="3D Vision"
+        Icon="Resources/AppIcon.ico"
         Height="780" Width="1360"
         WindowStartupLocation="CenterScreen"
         Background="{StaticResource PrimaryBackground}"
@@ -86,13 +88,23 @@
         <DockPanel Grid.Row="0" Background="{StaticResource PrimaryBackground}">
             <Menu DockPanel.Dock="Top" Background="Transparent" Foreground="{StaticResource PrimaryForeground}">
                 <MenuItem Header="文件">
-                    <MenuItem Header="新建"    Command="{Binding NewCommand}"/>
-                    <MenuItem Header="加载"    Command="{Binding LoadCommand}"/>
+                    <MenuItem Header="新建"    Command="{Binding NewCommand}"    InputGestureText="Ctrl+N"/>
+                    <MenuItem Header="加载"    Command="{Binding LoadCommand}"   InputGestureText="Ctrl+O"/>
+                    <MenuItem Header="最近加载"/>
                     <Separator/>
-                    <MenuItem Header="保存"    Command="{Binding SaveCommand}"/>
-                    <MenuItem Header="另存为"  Command="{Binding SaveAsCommand}"/>
+                    <MenuItem Header="保存"    Command="{Binding SaveCommand}"   InputGestureText="Ctrl+S"/>
+                    <MenuItem Header="另存为"  Command="{Binding SaveAsCommand}" InputGestureText="Ctrl+Shift+S"/>
+                    <Separator/>
+                    <MenuItem Header="退出"    Command="{Binding ExitCommand}"   InputGestureText="Ctrl+Q"/>
                 </MenuItem>
-                <MenuItem Header="编辑"/>
+                <MenuItem Header="资源">
+                    <MenuItem Header="重新扫描插件" Click="OnRescanPlugins"/>
+                    <Separator/>
+                    <MenuItem Header="打开插件目录" Click="OnOpenPluginsDir"/>
+                    <MenuItem Header="打开模型目录" Click="OnOpenModelsDir"/>
+                    <MenuItem Header="打开自动保存目录" Click="OnOpenAutosaveDir"/>
+                    <MenuItem Header="打开日志目录" Click="OnOpenLogsDir"/>
+                </MenuItem>
                 <MenuItem Header="视图" SubmenuOpened="OnViewMenuOpened">
                     <MenuItem Header="窗口布局一"/>
                     <MenuItem Header="窗口布局二"/>
@@ -119,22 +131,111 @@
                     <MenuItem Header="单次运行" Command="{Binding RunOnceCommand}"/>
                     <MenuItem Header="停止"     Command="{Binding StopCommand}"/>
                 </MenuItem>
-                <MenuItem Header="帮助"/>
+                <MenuItem Header="设置">
+                    <MenuItem Header="语言">
+                        <MenuItem Header="简体中文" IsCheckable="True" IsChecked="True"/>
+                        <MenuItem Header="English" IsCheckable="True"/>
+                    </MenuItem>
+                    <MenuItem Header="首选项" Click="OnOpenPreferences"/>
+                    <Separator/>
+                    <MenuItem Header="恢复默认布局" Click="OnResetLayout"/>
+                </MenuItem>
+                <MenuItem Header="帮助">
+                    <MenuItem Header="帮助文档" Click="OnOpenHelpDoc"/>
+                    <MenuItem Header="官方网站" Click="OnOpenWebsite"/>
+                    <Separator/>
+                    <MenuItem Header="检查更新" Click="OnCheckUpdate"/>
+                    <MenuItem Header="关于 3D Vision Suite" Click="OnShowAbout"/>
+                </MenuItem>
             </Menu>
 
-            <DockPanel DockPanel.Dock="Bottom" Margin="4 2">
+            <!-- 工具栏：图标 + 文字，排版与配色参照SZ工具条 -->
+            <DockPanel DockPanel.Dock="Bottom" Margin="4 10 4 6">
                 <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
-                    <Button Content="新建"     Command="{Binding NewCommand}"     Margin="0 0 4 0"/>
-                    <Button Content="加载"     Command="{Binding LoadCommand}"    Margin="0 0 4 0"/>
-                    <Button Content="保存"     Command="{Binding SaveCommand}"    Margin="0 0 4 0"/>
-                    <Button Content="另存为"   Command="{Binding SaveAsCommand}"  Margin="0 0 4 0"/>
-                    <Separator/>
-                    <Button Content="运行"     Command="{Binding RunCommand}"     Margin="4 0"/>
-                    <Button Content="单次运行" Command="{Binding RunOnceCommand}" Margin="0 0 4 0"/>
-                    <Button Content="停止"     Command="{Binding StopCommand}"    Margin="0 0 4 0"/>
-                    <Separator/>
-                    <Button Content="删除选中" Command="{Binding Editor.DeleteSelectedCommand}" Margin="4 0 4 0"/>
-                    <Button Content="新建分组" Command="{Binding Editor.CreateGroupCommand}" Margin="4 0 4 0"/>
+                    <!-- 运行 -->
+                    <Button Style="{StaticResource ToolbarButton}" Command="{Binding RunCommand}">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Width="16" Height="16" Stretch="Uniform"
+                                  Data="{StaticResource GeoRun}" Fill="{StaticResource IconRun}"/>
+                            <TextBlock Text="运行" Margin="5 0 0 0" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <!-- 停止 -->
+                    <Button Style="{StaticResource ToolbarButton}" Command="{Binding StopCommand}">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Width="16" Height="16" Stretch="Uniform"
+                                  Data="{StaticResource GeoStop}" Fill="{StaticResource IconStop}"/>
+                            <TextBlock Text="停止" Margin="5 0 0 0" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <!-- 单次运行 -->
+                    <Button Style="{StaticResource ToolbarButton}" Command="{Binding RunOnceCommand}">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Width="16" Height="16" Stretch="Uniform"
+                                  Data="{StaticResource GeoStep}" Fill="{StaticResource IconStep}"/>
+                            <TextBlock Text="单次运行" Margin="5 0 0 0" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Rectangle Style="{StaticResource ToolbarSeparator}"/>
+
+                    <!-- 状态指示：圆点 + 文本 -->
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="2 0">
+                        <Ellipse Width="10" Height="10" VerticalAlignment="Center" Fill="{StaticResource IconDelete}"/>
+                        <TextBlock Text="{Binding StatusText}" Margin="5 0 0 0" VerticalAlignment="Center"
+                                   FontSize="13" Foreground="{StaticResource PrimaryForeground}"/>
+                    </StackPanel>
+
+                    <Rectangle Style="{StaticResource ToolbarSeparator}"/>
+
+                    <!-- 新建 -->
+                    <Button Style="{StaticResource ToolbarButton}" Command="{Binding NewCommand}">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Width="16" Height="16" Stretch="Uniform"
+                                  Data="{StaticResource GeoNew}" Stroke="{StaticResource IconDoc}"
+                                  StrokeThickness="1.4" Fill="Transparent"/>
+                            <TextBlock Text="新建" Margin="5 0 0 0" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <!-- 加载 -->
+                    <Button Style="{StaticResource ToolbarButton}" Command="{Binding LoadCommand}">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Width="16" Height="16" Stretch="Uniform"
+                                  Data="{StaticResource GeoLoad}" Stroke="{StaticResource IconLoad}"
+                                  StrokeThickness="1.4" Fill="Transparent"/>
+                            <TextBlock Text="加载" Margin="5 0 0 0" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <!-- 保存 -->
+                    <Button Style="{StaticResource ToolbarButton}" Command="{Binding SaveCommand}">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Width="16" Height="16" Stretch="Uniform"
+                                  Data="{StaticResource GeoSave}" Stroke="{StaticResource IconSave}"
+                                  StrokeThickness="1.4" Fill="Transparent"/>
+                            <TextBlock Text="保存" Margin="5 0 0 0" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <!-- 另存为 -->
+                    <Button Style="{StaticResource ToolbarButton}" Command="{Binding SaveAsCommand}">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Width="16" Height="16" Stretch="Uniform"
+                                  Data="{StaticResource GeoSaveAs}" Stroke="{StaticResource IconSaveAs}"
+                                  StrokeThickness="1.4" Fill="Transparent"/>
+                            <TextBlock Text="另存为" Margin="5 0 0 0" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Rectangle Style="{StaticResource ToolbarSeparator}"/>
+
+                    <!-- 新建分组 -->
+                    <Button Style="{StaticResource ToolbarButton}" Command="{Binding Editor.CreateGroupCommand}">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Width="16" Height="16" Stretch="Uniform"
+                                  Data="{StaticResource GeoGroup}" Stroke="{StaticResource IconGroup}"
+                                  StrokeThickness="1.4" Fill="Transparent"/>
+                            <TextBlock Text="新建分组" Margin="5 0 0 0" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
                     <TextBlock Text="状态：" Foreground="{StaticResource MutedForeground}" VerticalAlignment="Center"/>
@@ -149,6 +250,14 @@
             <avalondock:DockingManager.Theme>
                 <avalondockTheme:Vs2013DarkTheme/>
             </avalondock:DockingManager.Theme>
+
+            <!-- 面板标题栏三角下拉 / 右键菜单：AvalonDock 使用自有子类 ContextMenuEx / MenuItemEx，
+                 隐式 ContextMenu/MenuItem 样式不匹配子类，故在此显式指定深色样式，
+                 去掉白色图标栏，与顶部菜单下拉保持一致。 -->
+            <avalondock:DockingManager.Resources>
+                <Style TargetType="{x:Type adctrl:ContextMenuEx}" BasedOn="{StaticResource DarkContextMenu}"/>
+                <Style TargetType="{x:Type adctrl:MenuItemEx}" BasedOn="{StaticResource {x:Type MenuItem}}"/>
+            </avalondock:DockingManager.Resources>
 
             <avalondock:LayoutRoot>
                 <!-- 顶层 Vertical：三列工作区（上） + 日志（下），对应今日 Grid 的 row1/row3 -->
@@ -224,13 +333,12 @@
                             </avalondock:LayoutAnchorable>
                         </avalondock:LayoutAnchorablePane>
 
-                        <!-- 中央：算子图作为中央文档窗格（其余面板围绕其停靠），不设固定宽、吃剩余 *，DockMinWidth=300 复刻今日中列 MinWidth -->
-                        <avalondock:LayoutDocumentPaneGroup>
-                            <avalondock:LayoutDocumentPane DockMinWidth="300">
-                                <avalondock:LayoutDocument Title="算子图"
-                                                           ContentId="panel.graph"
-                                                           CanClose="False"
-                                                           CanFloat="False">
+                        <!-- 中央：算子图改为可停靠面板（与 2D/3D 一致，可拖拽/浮动/隐藏），吃剩余 *，DockMinWidth=300 复刻今日中列 MinWidth -->
+                        <avalondock:LayoutAnchorablePane DockMinWidth="300">
+                            <avalondock:LayoutAnchorable Title="算子图"
+                                                         ContentId="panel.graph"
+                                                         CanClose="False"
+                                                         CanHide="True">
                                     <!-- 中列：算子图（Nodify 节点画布） -->
                                     <nodify:NodifyEditor x:Name="Editor"
                                                          DataContext="{Binding Editor}"
@@ -295,9 +403,8 @@
                                             <KeyBinding Key="Delete" Command="{Binding DeleteSelectedCommand}"/>
                                         </nodify:NodifyEditor.InputBindings>
                                     </nodify:NodifyEditor>
-                                </avalondock:LayoutDocument>
-                            </avalondock:LayoutDocumentPane>
-                        </avalondock:LayoutDocumentPaneGroup>
+                            </avalondock:LayoutAnchorable>
+                        </avalondock:LayoutAnchorablePane>
 
                         <!-- 右列：工具箱四面板（固定宽 300，DockMinWidth=240 复刻今日右列 MinWidth）。
                              四个独立 LayoutAnchorable 放在同一 pane 内，初始合并为一个 Tab 组
@@ -335,14 +442,15 @@
                                                             <DataTemplate DataType="{x:Type vm:ParameterViewModel}">
                                                                 <Grid Margin="0 3">
                                                                     <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="Auto" MinWidth="70"/>
                                                                         <ColumnDefinition Width="*"/>
-                                                                        <ColumnDefinition Width="Auto"/>
                                                                     </Grid.ColumnDefinitions>
                                                                     <TextBlock Text="{Binding Name}" VerticalAlignment="Center"
                                                                                Foreground="{StaticResource PrimaryForeground}"
                                                                                Margin="0 0 8 0" TextTrimming="CharacterEllipsis"/>
-                                                                    <TextBox Grid.Column="1" Width="130" Text="{Binding Text}"
-                                                                             VerticalAlignment="Center">
+                                                                    <TextBox Grid.Column="1" Text="{Binding Text}"
+                                                                             VerticalAlignment="Center"
+                                                                             HorizontalAlignment="Stretch">
                                                                         <TextBox.Style>
                                                                             <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
                                                                                 <Style.Triggers>

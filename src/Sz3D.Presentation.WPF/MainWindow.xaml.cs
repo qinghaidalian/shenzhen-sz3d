@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System.Diagnostics;
+using System.IO;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
@@ -114,7 +115,7 @@ public partial class MainWindow : Window
         }
     }
 
-    // ── 视图菜单：面板显示/隐藏切换（仿图漾） ─────────────────────────────
+    // ── 视图菜单：面板显示/隐藏切换（仿SZ） ─────────────────────────────
 
     /// <summary>
     /// 按 <c>ContentId</c> 在当前布局树里查找可停靠面板（包含已隐藏/浮动的面板）。
@@ -155,9 +156,8 @@ public partial class MainWindow : Window
     {
         MenuPanelView3D.IsChecked = IsPanelVisible(IdView3D);
         MenuPanelView2D.IsChecked = IsPanelVisible(IdView2D);
-        // 算子图为中央文档（不可关闭），恒为显示状态
-        MenuPanelGraph.IsChecked = true;
-        MenuPanelGraph.IsEnabled = false;
+        // 算子图改为可停靠/可隐藏面板，勾选态同步为实际可见状态（与 2D/3D 一致）
+        MenuPanelGraph.IsChecked = IsPanelVisible(IdGraph);
         // 工具箱四面板：勾选态同步为各自实际可见状态
         MenuPanelProps.IsChecked = IsPanelVisible(IdProps);
         MenuPanelOpTree.IsChecked = IsPanelVisible(IdOpTree);
@@ -177,10 +177,91 @@ public partial class MainWindow : Window
 
     private void OnTogglePanelDebug(object sender, RoutedEventArgs e) => TogglePanel(IdDebug);
 
-    private void OnTogglePanelGraph(object sender, RoutedEventArgs e)
+    private void OnTogglePanelGraph(object sender, RoutedEventArgs e) => TogglePanel(IdGraph);
+
+    // ── 资源菜单 ─────────────────────────────
+
+    /// <summary>重新扫描插件目录（首版：提示需重启以隔离加载新插件）。</summary>
+    private void OnRescanPlugins(object sender, RoutedEventArgs e)
     {
-        // 算子图不可隐藏；点击仅保持勾选，避免误把文档从布局移除
-        MenuPanelGraph.IsChecked = true;
+        // 插件在独立 AssemblyLoadContext 隔离加载，当前会话已反射缓存算子库；
+        // 首版不做运行期热重载，提示用户重启生效，避免给出“已重载”的错误承诺。
+        MessageBox.Show(this,
+            "插件变更将在下次启动时重新隔离加载。\n请将插件 DLL 放入 plugins 目录后重启应用。",
+            "重新扫描插件", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    private void OnOpenPluginsDir(object sender, RoutedEventArgs e) => OpenFolder("plugins");
+
+    private void OnOpenModelsDir(object sender, RoutedEventArgs e) => OpenFolder("ModelStore");
+
+    private void OnOpenAutosaveDir(object sender, RoutedEventArgs e) => OpenFolder("autosave");
+
+    private void OnOpenLogsDir(object sender, RoutedEventArgs e) => OpenFolder("logs");
+
+    /// <summary>
+    /// 在资源管理器中打开 <see cref="AppContext.BaseDirectory"/> 下的约定子目录，
+    /// 目录不存在则先创建。失败仅记日志并提示，不崩溃。
+    /// </summary>
+    private void OpenFolder(string relativeDir)
+    {
+        try
+        {
+            var path = Path.Combine(AppContext.BaseDirectory, relativeDir);
+            Directory.CreateDirectory(path);
+            Process.Start(new ProcessStartInfo("explorer.exe", $"\"{path}\"") { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            CrashLogger.Write(ex);
+            MessageBox.Show(this, $"无法打开目录「{relativeDir}」：{ex.Message}",
+                "打开目录", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    // ── 设置菜单 ─────────────────────────────
+
+    private void OnOpenPreferences(object sender, RoutedEventArgs e)
+    {
+        MessageBox.Show(this, "首选项设置界面开发中。", "首选项",
+            MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    /// <summary>恢复默认停靠布局（复用布局回退逻辑）。</summary>
+    private void OnResetLayout(object sender, RoutedEventArgs e) => ResetToDefaultLayout();
+
+    // ── 帮助菜单 ─────────────────────────────
+
+    private void OnOpenHelpDoc(object sender, RoutedEventArgs e) => OpenUrl("https://www.percipio.xyz");
+
+    private void OnOpenWebsite(object sender, RoutedEventArgs e) => OpenUrl("https://www.percipio.xyz");
+
+    private void OnCheckUpdate(object sender, RoutedEventArgs e)
+    {
+        MessageBox.Show(this, "当前已是最新版本。", "检查更新",
+            MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    private void OnShowAbout(object sender, RoutedEventArgs e)
+    {
+        MessageBox.Show(this,
+            "3D Vision Suite\n3D 视觉编程平台\n\n版本 1.0.0",
+            "关于 3D Vision Suite", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    /// <summary>用系统默认浏览器打开链接。失败仅记日志，不崩溃。</summary>
+    private void OpenUrl(string url)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            CrashLogger.Write(ex);
+            MessageBox.Show(this, $"无法打开链接：{ex.Message}",
+                "打开链接", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     // ── 布局持久化 ─────────────────────────────

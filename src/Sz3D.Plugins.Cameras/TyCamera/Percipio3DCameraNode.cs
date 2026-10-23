@@ -5,10 +5,10 @@ using Sz3D.Core.Infrastructure.Models;
 namespace Sz3D.Plugins.Cameras.TyCamera;
 
 /// <summary>
-/// 图漾 3D 相机节点——通过 P/Invoke 封装 camport3 C API。
+/// SZ 3D 相机节点——通过 P/Invoke 封装 camport3 C API。
 /// 无硬件时自动降级为 SimulatedCameraNode。
 /// </summary>
-[NodeType(Category = "相机 SDK", Name = "图漾 3D 相机",
+[NodeType(Category = "相机 SDK", Name = "SZ 3D 相机",
     Description = "设备枚举/连接/参数配置/彩色深度图采集")]
 public sealed class Percipio3DCameraNode : NodeBase
 {
