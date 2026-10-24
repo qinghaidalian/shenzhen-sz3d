@@ -40,11 +40,27 @@ public sealed class MainViewModel : ViewModelBase
 
     private CategoryOption? _selectedCategory;
 
-    /// <summary>当前选中的算子种类；变化时重算过滤结果。「全部算子」时不按种类过滤。</summary>
+    /// <summary>
+    /// 当前选中的算子种类；变化时重算过滤结果。「全部算子」时不按种类过滤，
+    /// 并清空查找关键字，使列表真正恢复为全量算子（而非沿用上一次的关键字过滤结果）。
+    /// </summary>
     public CategoryOption? SelectedCategory
     {
         get => _selectedCategory;
-        set { if (Set(ref _selectedCategory, value)) RebuildFilteredGroups(); }
+        set
+        {
+            if (!Set(ref _selectedCategory, value)) return;
+
+            // 切到「全部算子」时一并清空关键字；经 SearchKeyword 赋值走属性通知以同步查找框 UI，
+            // 其 setter 内部已触发一次重算，故此处直接 return 避免重复重算。
+            if (value?.Category is null && _searchKeyword.Length != 0)
+            {
+                SearchKeyword = "";
+                return;
+            }
+
+            RebuildFilteredGroups();
+        }
     }
 
     public ObservableCollection<LogEntry> Logs { get; } =

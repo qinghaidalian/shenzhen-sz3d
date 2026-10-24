@@ -125,6 +125,8 @@
                               Click="OnTogglePanelOpList"/>
                     <MenuItem x:Name="MenuPanelDebug"  Header="调试面板" IsCheckable="True"
                               Click="OnTogglePanelDebug"/>
+                    <MenuItem x:Name="MenuPanelLog"    Header="日志" IsCheckable="True"
+                              Click="OnTogglePanelLog"/>
                 </MenuItem>
                 <MenuItem Header="运行">
                     <MenuItem Header="运行"     Command="{Binding RunCommand}"/>

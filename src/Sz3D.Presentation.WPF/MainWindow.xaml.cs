@@ -163,6 +163,7 @@ public partial class MainWindow : Window
         MenuPanelOpTree.IsChecked = IsPanelVisible(IdOpTree);
         MenuPanelOpList.IsChecked = IsPanelVisible(IdOpList);
         MenuPanelDebug.IsChecked = IsPanelVisible(IdDebug);
+        MenuPanelLog.IsChecked = IsPanelVisible(IdLog);
     }
 
     private void OnTogglePanelView3D(object sender, RoutedEventArgs e) => TogglePanel(IdView3D);
@@ -178,6 +179,8 @@ public partial class MainWindow : Window
     private void OnTogglePanelDebug(object sender, RoutedEventArgs e) => TogglePanel(IdDebug);
 
     private void OnTogglePanelGraph(object sender, RoutedEventArgs e) => TogglePanel(IdGraph);
+
+    private void OnTogglePanelLog(object sender, RoutedEventArgs e) => TogglePanel(IdLog);
 
     // ── 资源菜单 ─────────────────────────────
 
